@@ -1,0 +1,27 @@
+{
+    "titulo": "Sopa de carne fitness",
+    "ingredientes": [
+        "1/2 kg de patinho sem capa de gordura cortado em pequenos cubos",
+        "1 cebola média picada",
+        "200 g de abóbora cortada em pequenos cubos",
+        "2 cenouras cortadas em pequnos cubos",
+        "100 g de vagem picada",
+        "2 colheres (sobremesa) de óleo de girassol",
+        "2 colheres (sobremesa) de manteiga light",
+        "1 colher (sobremesa) de sal",
+        "1 colher (sobremesa) de ervas finas",
+        "1 ramo de cebolinha picada",
+        "400 g de macarrão integral tipo penne ou fusilli"
+    ],
+    "modo_preparo": [
+        "Utilizando uma panela de pressão, junte o óleo de girassol, a manteiga e a cebola. Deixe dourar a cebola por 5 minutos.",
+        "Acrescente a carne picadinha e mexa bem para refogar.",
+        "Junte a abóbora, cenoura e a vagem.",
+        "Acrescente água até cobrir todos os ingredientes e tampe a panela.",
+        "Assim que a pressão pegar, abaixe o fogo e cozinhe por 20 minutos.",
+        "Feito isso, apague o fogo e espere a pressão sair (não antecipe essa etapa, faz parte do cozimento).",
+        "Abra a panela, junte o sal, as ervas finas, cebolinha e o macarrão.",
+        "Cozinhe, com a panela aberta, até que o macarrão fique cozido no ponto al dente.",
+        "Sirva acompanhado de torradas de pão integral."
+    ]
+}

@@ -1,0 +1,21 @@
+{
+    "titulo": "Panqueca de banana proteica",
+    "ingredientes": [
+        "1 banana nanica",
+        "1 colher pequena de canela",
+        "2 colheres grandes de aveia",
+        "1 scoop de whey",
+        "1 cooler grande de pasta de amendoim",
+        "1 ovo",
+        "1 colher pequena de manteiga light sem sal"
+    ],
+    "modo_preparo": [
+        "Amasse 1 banana nanica.",
+        "Adicione a canela, aveia, whey, pasta de amendoim e misture bem.",
+        "Após, misture o ovo e misture bem novamente.",
+        "Em uma frigideira, derreta a manteiga.",
+        "Após, coloque toda a massa e espalhe o máximo.",
+        "Vire quando desgrudar da frigideira.",
+        "Geralmente leva 2 minutos de cada lado em fogo médio."
+    ]
+}

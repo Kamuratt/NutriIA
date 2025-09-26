@@ -1,0 +1,21 @@
+{
+    "titulo": "Receita de molho branco para lasanha",
+    "ingredientes": [
+        "4 colheres de farinha de trigo",
+        "2 colheres de manteiga ou margarina",
+        "1/2 litro de leite",
+        "cebola picada",
+        "alho",
+        "creme de leite",
+        "queijo ralado",
+        "sal",
+        "noz-moscada"
+    ],
+    "modo_preparo": [
+        "Frite o alho e a cebola na manteiga",
+        "Adicione o leite, as colheres de farinha de trigo, sal e noz-moscada a gosto",
+        "Mexer até engrossar o molho",
+        "Baixar o fogo deixar cozinhar por 5 minutos",
+        "Desligue o fogo acrescente o queijo ralado e o creme de leite"
+    ]
+}

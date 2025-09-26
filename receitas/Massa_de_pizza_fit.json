@@ -1,0 +1,23 @@
+{
+    "titulo": "Massa de pizza fit",
+    "ingredientes": [
+        "1 batata-doce",
+        "1 xícara de farinha de quinoa",
+        "pimenta calabresa a gosto",
+        "alecrim fresco a gosto",
+        "orégano a gosto",
+        "tomilho seco a gosto",
+        "1 colher (chá) de sal",
+        "1 colher (sopa) de azeite"
+    ],
+    "modo_preparo": [
+        "Descasque a batata-doce, corte-a em cubinhos e cozinhe.",
+        "Amasse bem até formar um purê.",
+        "Em uma tigela grande, misture todos os ingredientes.",
+        "Misture bem até formar uma massa homogênea.",
+        "Espalhe a massa em uma forma com papel-manteiga, ela deve ficar com 1,5 cm no máximo.",
+        "Leve ao forno preaquecido (180° C) por 18 minutos.",
+        "Retire a massa do forno e deixe esfriar um pouco.",
+        "Recheie da maneira que preferir e leve ao forno até que o queijo derreta"
+    ]
+}

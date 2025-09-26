@@ -1,0 +1,24 @@
+{
+    "titulo": "Bolo fitness ou saudável",
+    "ingredientes": [
+        "3 bananas",
+        "3 ovos",
+        "1 xícara de óleo",
+        "1 xícara de farinha de trigo",
+        "1 colher de fermento em pó",
+        "1 xícara de açúcar mascavo",
+        "1 xícara de aveia em flocos",
+        "1 colher de chia ou linhaça (opcional)",
+        "castanha ou o amendoim a gosto (opcional)"
+    ],
+    "modo_preparo": [
+        "Bata na batedeira ou no liquidificador os ovos, açúcar, chia, aveia, óleo e farinha de trigo.",
+        "Corte a banana em pedaços.",
+        "Amasse a castanha ou o amendoim.",
+        "Adicione o fermento, a banana e a castanha ou o amendoim; bata tudo até ficar homogêneo.",
+        "Unte a forma com manteiga e farinha de trigo.",
+        "Depois da forma untada coloque a massa na forma.",
+        "Preaqueça o forno por 10 minutos a 180º C",
+        "Coloque o bolo para assar por 30 minutos."
+    ]
+}
