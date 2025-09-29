@@ -1,0 +1,23 @@
+{
+    "titulo": "Petisco rápido",
+    "url": "https://www.tudogostoso.com.br/receita/166699-petisco-rapido.html",
+    "ingredientes": [
+        "14 bolachas cream cracker ou de gergelim",
+        "2 tomates médios maduros cortados em rodela e fatiados em meia lua",
+        "azeite de oliva",
+        "4 fatias de presunto cortadas em 4 pedaços",
+        "4 fatias de queijo cortadas em 4 pedaços",
+        "sal",
+        "orégano desidratado"
+    ],
+    "modo_preparo": [
+        "Em uma forma que vá ao forno convencional disponha as bolachas.",
+        "Em cada bolacha coloque uma meia lua de tomate.",
+        "Regue os tomates com azeite de oliva a gosto.",
+        "Tempere com o sal.",
+        "Coloque um pedaço de presunto sobre cada tomate.",
+        "Coloque um pedaço de queijo sobre cada presunto.",
+        "Cubra com orégano a gosto.",
+        "Leve ao forno a 180ºC e quando o queijo estiver dourando retire."
+    ]
+}

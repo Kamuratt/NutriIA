@@ -1,0 +1,25 @@
+{
+    "titulo": "Salsichão",
+    "url": "https://www.tudogostoso.com.br/receita/102921-salsichao.html",
+    "ingredientes": [
+        "10 salsichas",
+        "10 fatias de presunto",
+        "10 fatias de queijo mussarela",
+        "Farinha de rosca",
+        "2 ovos",
+        "3 xícaras de farinha de trigo",
+        "3 xícaras de água",
+        "2 caldos de carne",
+        "3 colheres de margarina"
+    ],
+    "modo_preparo": [
+        "Cozinhe as salsichas apenas com água em fogo médio por 5 minutos. Após, lave-as bem e deixe escorrer. Reserve.",
+        "Em uma panela, coloque a água, dissolva os caldos de carne, adicione a margarina e mexa até levantar fervura.",
+        "Adicione farinha aos poucos até que a massa fique homogênea. Se necessário, adicione um pouco mais de farinha para dar ponto à massa.",
+        "Enrole as salsichas uma a uma com uma fatia de queijo e de presunto de modo que o queijo fique em contato com a salsicha.",
+        "Abra a massa bem fina e enrole a salsicha.",
+        "Passe no ovo e empane na farinha de rosca.",
+        "Frite em seguida em óleo bem quente.",
+        "Se preferir, adicione mais uma fatia de queijo em cada salsicha."
+    ]
+}

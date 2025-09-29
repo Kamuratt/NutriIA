@@ -5,6 +5,7 @@ import time  # Importe a biblioteca time
 import random # Importe a biblioteca random para pausas mais naturais
 import cloudscraper
 from bs4 import BeautifulSoup
+from unidecode import unidecode # Importe a biblioteca no início do seu script
 
 def buscar_links_receitas(termo: str, paginas: int = 1) -> list[str]:
     """Busca links de receitas pelo termo informado no TudoGostoso."""
@@ -74,6 +75,7 @@ def scrape_receita(url: str, scraper) -> dict:
 
     receita = {
         "titulo": titulo,
+        "url": url,
         "ingredientes": ingredientes,
         "modo_preparo": modo_preparo
     }
@@ -81,30 +83,46 @@ def scrape_receita(url: str, scraper) -> dict:
     return receita
 
 def salvar_receita_json(receita: dict, pasta: str = "receitas"):
-    """Salva uma receita em arquivo JSON dentro de uma pasta"""
-    if not receita:
+    """Salva uma receita em arquivo JSON com um nome de arquivo seguro e normalizado."""
+    
+    # Adiciona uma verificação para garantir que a receita e o título existem
+    if not receita or not receita.get("titulo"):
+        print("AVISO: Receita sem título ou vazia. Não foi possível salvar.")
         return
     
     os.makedirs(pasta, exist_ok=True)
     
-    # Nome de arquivo seguro
-    nome_arquivo = re.sub(r'[\\/*?:"<>|]', "", receita["titulo"])
-    nome_arquivo = re.sub(r'[^a-zA-Z0-9_-]', '_', nome_arquivo) + ".json"
+    # --- LÓGICA DE LIMPEZA DE NOME DE ARQUIVO CORRIGIDA ---
+
+    # 1. Pega o título original
+    titulo_original = receita["titulo"]
+    
+    # 2. Normaliza: converte "Maçã" para "Maca", "Pão" para "Pao", etc.
+    nome_normalizado = unidecode(titulo_original)
+    
+    # 3. Converte tudo para minúsculas para padronizar
+    nome_normalizado = nome_normalizado.lower()
+    
+    # 4. Substitui espaços e outros separadores por um único underscore
+    nome_normalizado = re.sub(r'[\s-]+', '_', nome_normalizado)
+    
+    # 5. Remove qualquer caractere que não seja letra, número ou underscore
+    nome_seguro = re.sub(r'[^\w_]', '', nome_normalizado)
+
+    # 6. Monta o nome final do arquivo
+    nome_arquivo = nome_seguro + ".json"
     
     caminho = os.path.join(pasta, nome_arquivo)
     
     with open(caminho, "w", encoding="utf-8") as f:
         json.dump(receita, f, ensure_ascii=False, indent=4)
+        
     print(f"Arquivo '{caminho}' salvo com sucesso!")
 
-
-
-scraper_global = cloudscraper.create_scraper()
-
     # Defina o termo e o número de páginas que deseja buscar
-TERMO_DE_BUSCA = "fitness"
-NUMERO_DE_PAGINAS = 10 # Busque em 2 páginas de resultados, por exemplo
-
+TERMO_DE_BUSCA = "pratico"
+NUMERO_DE_PAGINAS = 162 # Busque em 2 páginas de resultados, por exemplo
+scraper_global = cloudscraper.create_scraper()
 links_das_receitas = buscar_links_receitas(TERMO_DE_BUSCA, paginas=NUMERO_DE_PAGINAS)
 
 if links_das_receitas:
@@ -113,7 +131,7 @@ if links_das_receitas:
         receita_extraida = scrape_receita(link, scraper_global)
         salvar_receita_json(receita_extraida)
         # Pausa entre a extração de cada receita
-        time.sleep(random.uniform(1, 2))
+        time.sleep(random.uniform(1, 3))
 else: # Este else pertence ao 'if'
     print("Nenhum link de receita foi encontrado para o termo informado.")
 

@@ -1,0 +1,21 @@
+{
+    "titulo": "Torta de frigideira",
+    "url": "https://www.tudogostoso.com.br/receita/101083-torta-de-frigideira.html",
+    "ingredientes": [
+        "3 ovos",
+        "1/2 xícara (chá) de leite",
+        "1 xicara (chá) de farinha de trigo",
+        "1 colher (chá) de fermento em pó",
+        "2 dentes de alho amassados",
+        "1/2 cebola ralada",
+        "1/2 colher (chá) de sal",
+        "1 colher (sopa) de óleo",
+        "1 xicara (chá) de carne moida refogada"
+    ],
+    "modo_preparo": [
+        "Bata os ovos e junte o leite, a farinha, o fermento, o alho, a cebola e o sal.",
+        "Em uma frigideira pequena, aqueça o óleo e espalhe metade da massa.",
+        "Distribua a carne e cubra com a massa restante.",
+        "Frite, em fogo médio, por 8 a 10 minutos, virando na metade do tempo."
+    ]
+}

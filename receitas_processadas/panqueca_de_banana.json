@@ -1,0 +1,22 @@
+{
+    "titulo": "Panqueca de banana",
+    "url": "https://www.tudogostoso.com.br/receita/199530-panqueca-de-banana.html",
+    "ingredientes": [
+        "1 banana",
+        "2 ovos",
+        "2 colheres de aveia em flocos finos",
+        "1 pitada de canela (opcional)",
+        "óleo de coco",
+        "1 colher de mel"
+    ],
+    "modo_preparo": [
+        "Amasse a banana.",
+        "Em seguida, adicione os ovos, a aveia e a canela.",
+        "Misture tudo.",
+        "Unte uma frigideira com óleo de coco ou azeita extra virgem.",
+        "Despeje a mistura na frigideira e deixe em fogo baixo.",
+        "Tampe e espere o lado de baixo ficar firme.",
+        "Vire a panqueca e espere o outro lado também firmar.",
+        "Finalize com o mel."
+    ]
+}

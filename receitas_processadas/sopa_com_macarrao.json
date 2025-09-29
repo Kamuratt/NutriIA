@@ -1,0 +1,32 @@
+{
+    "titulo": "Sopa com macarrão",
+    "url": "https://www.tudogostoso.com.br/receita/200068-sopa-com-macarrao.html",
+    "ingredientes": [
+        "250 g de macarrão",
+        "2 dentes de alho",
+        "1/2 cebola",
+        "óleo para dourar",
+        "2 batatas grandes",
+        "1 e 1/2 mandioquinha",
+        "1 cenoura pequena",
+        "cebolinha e coentro a gosto",
+        "1 tomate",
+        "1/2 pimentão",
+        "1 caldo de galinha",
+        "1 sachê de tempero pronto de alho",
+        "1 sachê de tempero pronto",
+        "sal a gosto",
+        "água até cobrir os legumes"
+    ],
+    "modo_preparo": [
+        "Corte os legumes em cubinhos",
+        "Em uma panela de pressão, refogue a cebola e o alho com óleo",
+        "Acrescente o pimentão dando uma leve refogada,",
+        "Coloque todos legumes e o tomate e refogue mais um pouco",
+        "Junte o caldo de galinha,o sachê de tempero pronto, a cebolinha e o coentro",
+        "Cubra os legumes com água.",
+        "Ajuste o sal e quando levantar fervura junte o macarrão.",
+        "Feche a panela, assim que começar a ferver apague o fogo e espere sair a pressão.",
+        "E saboreie"
+    ]
+}

@@ -1,0 +1,24 @@
+{
+    "titulo": "Omelete de banana",
+    "url": "https://www.tudogostoso.com.br/receita/133708-omelete-de-banana.html",
+    "ingredientes": [
+        "2 ovos",
+        "2 colheres sopa de leite",
+        "1 colher sopa de flocos de aveia",
+        "2 fatias de queijo mussarela",
+        "1 banana prata ou nanica",
+        "1 colher de sopa de mel",
+        "canela a gosto",
+        "azeite",
+        "sal a gosto"
+    ],
+    "modo_preparo": [
+        "Misturar os ovos, o leite e o sal em um prato fundo.",
+        "Aquecer uma frigideira untada com o azeite em fogo alto.",
+        "Colocar os ovos misturados nessa frigideira e deixar em fogo alto até a omelete desgrudar da panela.",
+        "Colocar a aveia em todo a omelete.",
+        "Abaixar o fogo e virar a omelete (pode usar um prato para auxiliar).",
+        "Colocar o queijo, a banana e a canela em uma metade da omelete e em seguida dobrar a omelete no meio.",
+        "Desligar o fogo e colocar o mel por cima."
+    ]
+}

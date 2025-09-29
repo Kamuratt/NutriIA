@@ -1,0 +1,21 @@
+{
+    "titulo": "Lasanha de pão",
+    "url": "https://www.tudogostoso.com.br/receita/719-lasanha-de-pao.html",
+    "ingredientes": [
+        "1 caixa de pão de forma",
+        "Presunto",
+        "Queijo mussarela",
+        "1 peito de frango desfiado",
+        "Queijo ralado a gosto",
+        "1 lata de creme de leite",
+        "1 colher de manteiga",
+        "Sal a gosto",
+        "1 lata de extrato de tomate"
+    ],
+    "modo_preparo": [
+        "Retire a casca que fica ao lado do pão de forma deixando só a parte de dentro do pão.",
+        "Faça o molho com o extrato de tomate, o creme de leite, a manteiga e sal a gosto.",
+        "Coloque uma camada de pão na forma, após uma camada de presunto, do frango, queijo mussarela e depois o molho.",
+        "Repita novamente as camadas, por último polvilhe com queijo ralado e leve ao forno até  o queijo mussarela derreter."
+    ]
+}

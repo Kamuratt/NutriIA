@@ -1,0 +1,9 @@
+google-generativeai
+python-dotenv
+unidecode
+cloudscraper
+beautifulsoup4
+requests
+pandas
+fastapi
+SQLAlchemy

@@ -1,0 +1,26 @@
+{
+    "titulo": "Torta de pizza",
+    "url": "https://www.tudogostoso.com.br/receita/63332-torta-de-pizza.html",
+    "ingredientes": [
+        "4 ovos",
+        "1 xícara de leite",
+        "1/2 xícara de óleo",
+        "2 xícaras de farinha de trigo",
+        "1 colher (sopa) de fermento em pó",
+        "1 colher (chá) de sal",
+        "1 colher (sopa) de parmesão ralado",
+        "200 g de requeijão cremoso tipo catupiry",
+        "300 g de mussarela picada",
+        "1 tomate cortado em rodelas",
+        "orégano",
+        "parmesão",
+        "margarina e farinha de rosca para untar"
+    ],
+    "modo_preparo": [
+        "Bata no liquidificador, os ovos, leite, óleo, adicione aos poucos a farinha, o fermento, o parmesão, o sal e bata.",
+        "Depois despeje a massa em uma forma untada com margarina e farinha de rosca.",
+        "Espalhe o requeijão por cima da massa e distribua o queijo, por último o tomate em rodelas.",
+        "Jogue o orégano e parmesão.",
+        "Leve ao forno preaquecido por 30 minutos, ou até gratinar o queijo."
+    ]
+}

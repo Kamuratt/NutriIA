@@ -1,0 +1,25 @@
+{
+    "titulo": "Croquete",
+    "url": "https://www.tudogostoso.com.br/receita/8622-croquete.html",
+    "ingredientes": [
+        "1 xícara chá de farinha de rosca",
+        "3 colheres sopa de trigo",
+        "1 gema",
+        "3/4 de xícara chá de leite",
+        "Sal e pimenta do reino a gosto",
+        "1 xícara chá de tomate picado",
+        "1/2 xícara chá de salsinha picada",
+        "2 xícaras chá de sobras de carne desfiada",
+        "1 cebola ralada",
+        "1 colher sopa de azeite"
+    ],
+    "modo_preparo": [
+        "Em uma panela, coloque o azeite, cebola e refogue por 5 minutos.",
+        "Depois junte a carne desfiada, salsinha, tomate, sal, pimenta e refogue mais 10 minutos, mexendo de vez em quando.",
+        "Acrescente a farinha de trigo dissolvida no leite e a gema.",
+        "Cozinhe, mexendo sempre até soltar da panela.",
+        "Retire do fogo coloque sobre a pia e deixe esfriar.",
+        "Faça os croquetes, passe na farinha de rosca e frite em óleo bem quente por 10 minutos ou até dourar.",
+        "Retire do fogo, coloque sobre papel-toalha e sirva a seguir."
+    ]
+}

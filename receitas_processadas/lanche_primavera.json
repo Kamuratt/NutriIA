@@ -1,0 +1,27 @@
+{
+    "titulo": "Lanche primavera",
+    "url": "https://www.tudogostoso.com.br/receita/178493-lanche-primavera.html",
+    "ingredientes": [
+        "8 fatias de pão de forma",
+        "2 peitos de frango",
+        "1/2 xícara de requeijão cremoso",
+        "1/2 xícara de creme de leite",
+        "sal e pimenta a gosto",
+        "azeitonas picadas se preferir",
+        "1 dente de alho",
+        "orégano a gosto",
+        "fatias de mussarela para cobrir",
+        "azeite",
+        "maionese"
+    ],
+    "modo_preparo": [
+        "Tempere o frango com sal, pimenta-do-reino e alho.",
+        "Cozinhe o frango e desfie.",
+        "Misture o frango desfiado com o orégano, o requeijão e as azeitonas.",
+        "Leve ao fogo para aquecer um pouco, retire e misture o creme de leite, reserve.",
+        "Unte uma travessa ou forma com azeite e disponha as fatias de pão de forma.",
+        "Passe maionese nas fatias e coloque o creme de frango por cima delas.",
+        "Por cima, coloque a mussarela e orégano a gosto.",
+        "Leve ao forno médio até derreter o queijo."
+    ]
+}

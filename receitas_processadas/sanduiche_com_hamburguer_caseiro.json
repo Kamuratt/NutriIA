@@ -1,0 +1,28 @@
+{
+    "titulo": "Sanduíche com hambúrguer caseiro",
+    "url": "https://www.tudogostoso.com.br/receita/161709-sanduiche-com-hamburguer-caseiro.html",
+    "ingredientes": [
+        "1/2 kg de carne magra moída (patinho, acém, etc)",
+        "3 colheres (sopa) cebola e alho desidratados",
+        "3 colheres (sopa) cheiro verde fresco",
+        "sal a gosto",
+        "pimenta-do-reino a gosto",
+        "6 fatias de queijo prato",
+        "6 fatias de queijo cheddar",
+        "1 tomate cortado em fatias",
+        "6 pães de hambúrguer",
+        "6 folhas de alface americana",
+        "mostarda",
+        "catchup",
+        "maionese"
+    ],
+    "modo_preparo": [
+        "Peça para moer a carne duas vezes. Em uma tigela misture bem a carne moída, cebola e alho desidratados, cheiro verde, sal e pimenta-do-reino.",
+        "Modele os hambúrgueres e coloque na frigideira untada em fogo médio",
+        "Após 2 minutos, vire os hambúrgueres para grelhar do outro lado e adicione uma fatia queijo prato e por cima uma fatia do queijo cheddar em cada hambúrguer.",
+        "Tampe a frigideira para que os queijos derretam.",
+        "Abra os pães e coloque em uma grelha para esquentar por 1 minuto.",
+        "Passe a mostarda e catchup a gosto.",
+        "Adicione a folha de alface americana, as fatias de tomate, e por último o hambúrguer grelhado."
+    ]
+}

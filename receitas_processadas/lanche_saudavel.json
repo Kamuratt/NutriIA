@@ -1,0 +1,17 @@
+{
+    "titulo": "Lanche saudável",
+    "url": "https://www.tudogostoso.com.br/receita/185740-lanche-saudavel.html",
+    "ingredientes": [
+        "4 fatias de pães integral",
+        "legumes e vegetais (cenoura, milho, palmito, pepino, tomate) cortados ou ralados",
+        "folhas verdes cortadas",
+        "proteína (atum, sardinha, frango grelhado, queijo)",
+        "requeijão cremoso light a gosto"
+    ],
+    "modo_preparo": [
+        "Em uma frigideira antiaderente, doure os pães.",
+        "Passe o requeijão e acrescente as folhas verdes.",
+        "Coloque os vegetais desejados (cenoura, milho, palmito, pepino, tomate).",
+        "Por último, a proteína (atum, sardinha, frango grelhado, queijo)."
+    ]
+}

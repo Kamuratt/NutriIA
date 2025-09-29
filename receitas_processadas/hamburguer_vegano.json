@@ -1,0 +1,31 @@
+{
+    "titulo": "Hambúrguer vegano",
+    "url": "https://www.tudogostoso.com.br/receita/193883-hamburguer-vegano.html",
+    "ingredientes": [
+        "100 g de proteína texturizada de soja média",
+        "50 g de aveia em flocos",
+        "20 ml de sopa de shoyu light",
+        "10 ml de azeite",
+        "60 g de farinha de trigo integral",
+        "60 g de farinha de rosca",
+        "20 g de cheiro verde picado",
+        "10 g de hortelã desidratada (ou natural)",
+        "100 g de cebola ralada",
+        "50 g de cebolas picadas em micro brunoise",
+        "10 g de alho amassados",
+        "sal",
+        "pimenta-do-reino"
+    ],
+    "modo_preparo": [
+        "Em uma vasilha, hidrate a proteína de soja em 2 xícaras de água, coloque o shoyu e deixe descansar 15 minutos.",
+        "Em uma vasilha maior, suficientemente grande para caber todos os ingredientes, coloque a aveia, 1/2 xícara de água e o azeite, mexa e deixe descansar por 15 minutos também.",
+        "Enquanto descansam, pique, rale e amasse os demais ingredientes.",
+        "Escorra a proteína de soja, esprema e coloque na vasilha maior, misturando com a aveia.",
+        "Faça o mesmo com o cheiro verde, a cebola e o alho.",
+        "Acrescente a farinha de trigo e a farinha de rosca, misture e tempere com sal e pimenta a gosto.",
+        "Em seguida, deixe a massa descansar por 15 minutos.",
+        "Após esse tempo, faça bolinhas e achate-as no formato de hambúrguer.",
+        "Para evitar que despedacem enquanto fritam, deixe descansar por 20 minutos no freezer.",
+        "Frite-os em uma frigideira com teflon, com um fio de óleo, ou asse-os em uma assadeira untada por 20 minutos, em fogo médio."
+    ]
+}

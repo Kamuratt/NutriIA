@@ -1,0 +1,24 @@
+{
+    "titulo": "Minha receita de bolo de chocolate",
+    "url": "https://www.tudogostoso.com.br/receita/199264-minha-receita-de-bolo-de-chocolate.html",
+    "ingredientes": [
+        "3 ovos",
+        "1 xícara de açúcar mascavo",
+        "1 xícara de chocolate em pó",
+        "1 xícara de óleo",
+        "1 xícara de água quente",
+        "2 xícaras de farinha de trigo",
+        "1 colher de fermento químico"
+    ],
+    "modo_preparo": [
+        "Bata os ovos e o açúcar até o ponto de creme.",
+        "Adicione o chocolate em pó e o óleo.",
+        "Adicione a água quente (café também fica bom).",
+        "Misture bem com a batedeira e adicione a farinha de trigo.",
+        "E por ultimo, adicione o fermento.",
+        "Misturando suavemente, até q esteja todo incorporado a massa.",
+        "Unte uma forma de furo no meio com óleo ou margarina.",
+        "Polvilhe com chocolate ou achocolatado.",
+        "Despeje a massa e coloque para assar em forno preaquecido por 20 a 30 mim (dependendo do seu forno)."
+    ]
+}

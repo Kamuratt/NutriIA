@@ -1,0 +1,41 @@
+{
+    "titulo": "Bolinho de feijoada",
+    "url": "https://www.tudogostoso.com.br/receita/123918-bolinho-de-feijoada.html",
+    "ingredientes": [
+        "2 litros de água",
+        "1/2 kg de feijão preto",
+        "100 g de carne seca dessalgada em cubinhos",
+        "100 g de lombo defumado em cubinhos",
+        "100 g de costelinha dessalgada ou defumada",
+        "1 linguiça calabresa em cubos",
+        "1 paio cortado em cubos",
+        "3 folhas de louro",
+        "3 colheres de sopa de azeite",
+        "3 dentes de alho",
+        "200 g de farinha de mandioca fina, sem torrar",
+        "1 colher de sopa de polvilho azedo",
+        "2 maços de couve cortada bem fininha",
+        "250 g bacon em cubinhos para refogar a couve",
+        "2 dentes de alho para refogar a couve",
+        "Azeite",
+        "Farinha de rosca para empanar",
+        "Óleo para fritar",
+        "Gomos de laranja",
+        "Torresmo",
+        "Batida de limão para acompanhar"
+    ],
+    "modo_preparo": [
+        "Em uma panela de pressão, colocar 2 litros de água, o feijão, as carnes e as folhas de louro.",
+        "Cozinhar por aproximadamente uma hora (marcar o tempo após o início da pressão).",
+        "Em um liquidificador, bater o feijão cozido com o caldo das carnes.",
+        "Em uma panela grande, aquecer o azeite, dourar o alho e refogar o feijão batido.",
+        "Verificar o sal.",
+        "Acrescentar aos poucos a farinha de mandioca sem parar de mexer até engrossar e soltar da panela.",
+        "Retirar do fogo e deixar esfriar.",
+        "Adicionar o polvilho e misturar até ficar uma massa homogênea. Reservar.",
+        "Em uma frigideira dourar o bacon com o alho, juntar a couve e refogar por 2 minutos.",
+        "Abrir pequenas porções de massa na mão, colocar um colher de chá de couve refogada, fazer bolinhos e achatar.",
+        "Passar na farinha de rosca e fritar em óleo quente.",
+        "Em uma travessa, coloque os bolinhos acompanhados de gomos de laranja, torresmo e uma batidinha de limão."
+    ]
+}

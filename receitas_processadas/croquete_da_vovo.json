@@ -1,0 +1,25 @@
+{
+    "titulo": "Croquete da Vovó",
+    "url": "https://www.tudogostoso.com.br/receita/50478-croquete-da-vovo.html",
+    "ingredientes": [
+        "1 kg de carne moída",
+        "2 cebolas médias",
+        "3 dentes de alho",
+        "1 xícara de chá de salsinha",
+        "1 colher de chá de coentro",
+        "1 colher de sopa de manteiga",
+        "Sal",
+        "Orégano",
+        "3 colheres de chá de farinha de trigo",
+        "3 ovos",
+        "Farinha de rosca",
+        "Pimenta-do-reino"
+    ],
+    "modo_preparo": [
+        "Tempere a carne com o alho amassado e sal, coentro, salsinha, orégano e pimenta-do-reino.",
+        "Em uma panela doure a cebola em manteiga e coloque a carne.",
+        "Deixe cozinhar bem e acrescente a farinha de trigo, misture bem e deixe esfriar.",
+        "Enrole os croquetes, passe na farinha de rosca, no ovo e novamente na farinha de rosca.",
+        "Frite em óleo quente."
+    ]
+}

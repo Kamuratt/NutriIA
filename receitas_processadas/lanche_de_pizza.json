@@ -1,0 +1,23 @@
+{
+    "titulo": "Lanche de pizza",
+    "url": "https://www.tudogostoso.com.br/receita/40849-lanche-de-pizza.html",
+    "ingredientes": [
+        "1 pacote de pão de forma",
+        "200 g de mussarela",
+        "200 g de presunto",
+        "Orégano a gosto",
+        "500 ml de leite",
+        "1 lata de creme de leite (sem soro)",
+        "2 colheres (sopa) de amido de milho",
+        "1 pitada de sal"
+    ],
+    "modo_preparo": [
+        "Misture todos os ingredientes e leve ao fogo baixo até engrossar.",
+        "Reserve.",
+        "Em uma forma quadrada, de vidro ou alumínio, que possa ir ao forno, despeje um pouco de creme.",
+        "Coloque o pão de forma por cima, as fatias de mussarela e presunto e um pouquinho de orégano.",
+        "Repita o procedimento.",
+        "Leve ao forno por 20 minutos.",
+        "Espere esfriar e sirva."
+    ]
+}
