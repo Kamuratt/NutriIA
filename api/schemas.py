@@ -28,8 +28,10 @@ class UserRequestSchema(BaseModel):
     sexo: str  # 'homem' ou 'mulher'
     nivel_atividade: str # 'sedentario', 'leve', 'moderado', 'ativo'
     objetivo: str # 'perder_peso', 'manter_peso', 'ganhar_massa'
+    restricoes: List[str] = []  # Adicionamos o campo de restrições como uma lista de strings
 
 # Schema para a resposta que a API vai DEVOLVER
 class DietPlanResponseSchema(BaseModel):
     plano_texto: str
     meta_calorica_calculada: float
+    receitas_detalhadas: List[ReceitaSchema] = []
