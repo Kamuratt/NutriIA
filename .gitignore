@@ -1,0 +1,22 @@
+# Ambiente Virtual
+venv/
+/venv/
+
+# Arquivos de Cache do Python
+__pycache__/
+*.pyc
+
+# Arquivos de Segredos
+.env
+
+# Banco de Dados e Dados Grandes
+data/nutriai.db
+data/raw/Taco-4a-Edicao.xlsx
+
+# Pastas de configuração de IDEs/Editores
+.vscode/
+.idea/
+
+# Ignorar pastas com dados de scraping para não poluir o repositório
+data/receitas/
+data/receitas_processadas/

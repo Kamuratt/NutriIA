@@ -1,0 +1,20 @@
+# Ambiente Virtual
+venv
+/venv/
+
+# Arquivos de Cache do Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Git
+.git
+.gitignore
+
+# Banco de dados SQLite (para não copiar o banco de dados local para a imagem)
+*.db
+*.db-journal
+
+# Pasta de receitas (se você baixa os JSONs antes de inserir no banco)
+/receitas/
