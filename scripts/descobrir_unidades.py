@@ -1,7 +1,7 @@
 import sqlite3
 import pandas as pd
 
-ARQUIVO_BANCO = "nutriai.db"
+ARQUIVO_BANCO = "../data/nutriai.db"
 
 def raio_x_das_unidades():
     """

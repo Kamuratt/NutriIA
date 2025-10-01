@@ -4,9 +4,9 @@ import os
 import time
 
 # --- CONFIGURAÇÕES ---
-PASTA_A_PROCESSAR = "receitas"
-PASTA_PROCESSADOS = "receitas_processadas"
-ARQUIVO_BANCO = "nutriai.db"
+PASTA_A_PROCESSAR = "../data/receitas"
+PASTA_PROCESSADOS = "../data/receitas_processadas"
+ARQUIVO_BANCO = "../data/nutriai.db"
 
 # A função criar_tabelas continua a mesma.
 def criar_tabelas():

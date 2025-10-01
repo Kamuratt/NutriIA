@@ -2,7 +2,7 @@ import pandas as pd
 
 # O número do header pode precisar de ajuste (ex: header=1 ou header=2)
 # dependendo do arquivo que você baixou.
-caminho_do_arquivo = 'Taco-4a-Edicao.xlsx'
+caminho_do_arquivo = "../data/raw/Taco-4a-Edicao.xlsx"
 df = pd.read_excel(caminho_do_arquivo, header=0)
 
 colunas_de_interesse = [

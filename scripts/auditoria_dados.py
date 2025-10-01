@@ -10,7 +10,7 @@ import re
 # para garantir que a auditoria seja consistente com o cálculo.
 from calcular_nutrientes import carregar_tabela_taco, MAPEAMENTO_TACO_NORMALIZADO, BLACKLISTA_IGNORAR
 
-ARQUIVO_BANCO = "nutriai.db"
+ARQUIVO_BANCO = "../data/nutriai.db"
 
 def encontrar_alimento_localmente(nome_ingrediente: str, df_taco, conn):
     """

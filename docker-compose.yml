@@ -1,0 +1,22 @@
+services:
+  # Serviço 1: Sua aplicação NutriAI
+  nutriai-app:
+    build: . # Constrói a imagem usando o Dockerfile da pasta atual
+    container_name: nutriai_container
+    volumes:
+      - ./:/app # Mapeia a pasta atual para /app no contêiner
+    env_file:
+      - .env # Carrega as variáveis do arquivo .env
+
+  # Serviço 2: O n8n customizado
+  n8n:
+    build: ./n8n-custom # Constrói a imagem usando o Dockerfile da pasta n8n-custom
+    container_name: n8n
+    user: root
+    ports:
+      - "5678:5678"
+    volumes:
+      - ./n8n-data:/home/node/.n8n # <-- CORREÇÃO 1: Aponta para a pasta local
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - nutriai-app # Garante que o n8n só suba depois do nutriai-app

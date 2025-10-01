@@ -1,4 +1,3 @@
-# calcular_nutrientes.py (VERSÃO COM ARGUMENTOS E CORREÇÃO DE ERRO)
 import pandas as pd
 import sqlite3
 import unicodedata
@@ -7,18 +6,23 @@ import json
 import os
 import time
 import re
-import google.generativeai as genai
-from dotenv import load_dotenv
 import argparse
+import google.generativeai as genai
+from google.api_core import exceptions as google_exceptions # Importa as exceções
+from dotenv import load_dotenv
+from tqdm import tqdm # Importa a barra de progresso
 
-ARQUIVO_BANCO = "nutriai.db"
+ARQUIVO_BANCO = "../data/nutriai.db"
 load_dotenv()
+
+# --- NOVA EXCEÇÃO CUSTOMIZADA ---
+class QuotaExceededError(Exception):
+    """Exceção para quando a cota da API é atingida."""
+    pass
 
 BLACKLISTA_IGNORAR = {
     'água', 'agua', 'sal', 'gelo', 'palito de dente', 'papel chumbo',
-    'receita de', 'a gosto', 'quanto baste', 'q.b.',
-    'fritadeira elétrica',
-    # Adicionados para ignorar especiarias de baixo valor calórico
+    'receita de', 'a gosto', 'quanto baste', 'q.b.', 'fritadeira elétrica',
     'cravo-da-índia', 'ervas finas', 'pimenta biquinho', 'cravo'
 }
 
@@ -32,7 +36,7 @@ except (ValueError, TypeError) as e:
     print(f"ERRO: {e}")
     exit()
 
-def carregar_tabela_taco(caminho_csv: str = "tabela_taco_processada.csv"):
+def carregar_tabela_taco(caminho_csv: str = "../data/processed/tabela_taco_processada.csv"):
     try:
         df = pd.read_csv(caminho_csv)
         df['alimento_normalizado'] = df['alimento'].astype(str).str.lower().apply(
@@ -45,6 +49,7 @@ def carregar_tabela_taco(caminho_csv: str = "tabela_taco_processada.csv"):
         print(f"❌ ERRO ao carregar a Tabela TACO: {e}")
         return None
 
+# ... (padronizar_unidade, CONVERSOES_PARA_GRAMAS, MAPEAMENTO_TACO não mudam) ...
 def padronizar_unidade(unidade: str) -> str:
     if not unidade: return 'unidade'
     u_normalizada = ''.join(c for c in unicodedata.normalize('NFD', unidade.lower()) if unicodedata.category(c) != 'Mn')
@@ -76,71 +81,54 @@ CONVERSOES_PARA_GRAMAS = {
     ('genérico', 'pires'): 80.0, ('genérico', 'receita'): 0.0, ('pimentão vermelho', 'pedaço'): 100.0, ('pimentão verde', 'unidade'): 150.0,
     ('pimentão', 'unidade'): 150.0, ('genérico', 'medida'): 150.0, ('genérico', 'gotas'): 0.05, ('sonho de valsa', 'unidade'): 20.0, ('sorvete', 'bola'): 60.0,
     ('arroz', 'xicara'): 185.0,
-    ('espinafre', 'maço'): 200.0,
-    ('alho', 'cabeça'): 40.0,
 }
-
 CONVERSOES_PARA_GRAMAS_NORMALIZADO = {(''.join(c for c in unicodedata.normalize('NFD', k[0]) if unicodedata.category(c) != 'Mn'), k[1]): v for k, v in CONVERSOES_PARA_GRAMAS.items()}
 
 MAPEAMENTO_TACO = {
     "acucar mascavo": "Açúcar, mascavo", "acucar cristal": "Açúcar, cristal", "açúcar": "Açúcar, cristal",
-    "leite": "Leite, de vaca, integral, pó", "leite em po": "Leite, de vaca, integral, pó",
-    "oleo": "Óleo, de soja", "fermento": "Fermento em pó, químico", "bacon": "Toucinho, frito", "peito de frango": "Frango, peito, sem pele, cru",
-    "leite de coco": "Leite, de coco", "carne moida": "Carne, bovina, acém, moído, cru", "amido de milho": "Milho, amido, cru", "maisena": "Milho, amido, cru",
-    "azeite": "Azeite, de oliva, extra virgem", "molho de tomate": "Tomate, molho industrializado", "requeijao": "Queijo, requeijão, cremoso",
-    "canela": "canela, pó", "abobora": "Abóbora, moranga, crua", "abobrinha": "Abobrinha, italiana, crua",
-    "cheiro-verde": "Salsa, crua", "salsinha": "Salsa, crua", "proteina texturizada de soja": "Soja, extrato solúvel, pó", "proteina de soja": "Soja, extrato solúvel, pó",
+    "leite": "Leite, de vaca, integral, pó", "leite em po": "Leite, de vaca, integral, pó", "oleo": "Óleo, de soja",
+    "fermento": "Fermento em pó, químico", "bacon": "Toucinho, frito", "peito de frango": "Frango, peito, sem pele, cru",
+    "leite de coco": "Leite, de coco", "carne moida": "Carne, bovina, acém, moído, cru", "amido de milho": "Milho, amido, cru",
+    "maisena": "Milho, amido, cru", "azeite": "Azeite, de oliva, extra virgem", "molho de tomate": "Tomate, molho industrializado",
+    "requeijao": "Queijo, requeijão, cremoso", "canela": "canela, pó", "abobora": "Abóbora, moranga, crua",
+    "abobrinha": "Abobrinha, italiana, crua", "cheiro-verde": "Salsa, crua", "salsinha": "Salsa, crua",
+    "proteina texturizada de soja": "Soja, extrato solúvel, pó", "proteina de soja": "Soja, extrato solúvel, pó",
     "pts": "Soja, extrato solúvel, pó", "linguica suina": "Lingüiça, porco, crua", "doce de leite": "Doce, de leite, cremoso",
     "leite condensado": "Leite, condensado", "iogurte natural": "Iogurte, natural", "aveia": "Aveia, flocos, crua",
-    "ovo": "Ovo, de galinha, inteiro, cru", "ovos": "Ovo, de galinha, inteiro, cru", "alho": "Alho, cru", "cebola": "Cebola, crua", "batata": "Batata, inglesa, crua",
-    "ervilha": "Ervilha, enlatada, drenada", "palmito": "Palmito, pupunha, em conserva",
-    "manteiga": "Manteiga, com sal", "margarina": "Margarina, com óleo interesterificado, com sal (65%de lipídeos)", "abacate": "Abacate, cru",
-    "tomate": "Tomate, com semente, cru", "cenoura": "Cenoura, crua", "cebolinha": "Cebolinha, crua",
-    "farinha": "Farinha, de trigo", "limao": "Limão, tahiti, cru", "mel": "Mel, de abelha",
-    "raspas da casca de limao": "Limão, tahiti, cru", "molho de pimenta": "Pimentão, vermelho, cru",
-    "acai": "Açaí, polpa, congelada", "pimenta-do-reino": "pimenta do reino, pó", "gengibre": "gengibre, cru", "brigadeiro branco": "Doce, de leite, cremoso",
+    "ovo": "Ovo, de galinha, inteiro, cru", "ovos": "Ovo, de galinha, inteiro, cru", "alho": "Alho, cru", "cebola": "Cebola, crua",
+    "batata": "Batata, inglesa, crua", "ervilha": "Ervilha, enlatada, drenada", "palmito": "Palmito, pupunha, em conserva",
+    "manteiga": "Manteiga, com sal", "margarina": "Margarina, com óleo interesterificado, com sal (65%de lipídeos)",
+    "abacate": "Abacate, cru", "tomate": "Tomate, com semente, cru", "cenoura": "Cenoura, crua",
+    "cebolinha": "Cebolinha, crua", "farinha": "Farinha, de trigo", "limao": "Limão, tahiti, cru", "mel": "Mel, de abelha",
+    "raspas da casca de limao": "Limão, tahiti, cru", "molho de pimenta": "Pimentão, vermelho, cru", "acai": "Açaí, polpa, congelada",
+    "pimenta-do-reino": "pimenta do reino, pó", "gengibre": "gengibre, cru", "brigadeiro branco": "Doce, de leite, cremoso",
     "leite vegetal": "Soja, extrato solúvel, natural, fluido", "oleo vegetal": "Óleo, de soja", "azeite de oliva": "Azeite, de oliva, extra virgem",
-    "farelo de aveia": "Aveia, flocos, crua", "farinha de aveia": "Aveia, flocos, crua",
-    "goiabada": "Goiaba, doce, cascão", "farinha de trigo refinada": "Farinha, de trigo",
-    "pao de lo": "Bolo, pronto, simples", "sal grosso": "Tempero a base de sal",
-    "salsichas": "Salsicha, viena, enlatada", "sonho de valsa": "Chocolate, ao leite",
-    "sorvete": "sorvete, massa, baunilha", "licor": "Cana, aguardente 1",
-    "massa para salgados assados": "Pastel, massa, crua",
-    "queijo mussarela": "Queijo, mozarela", "mussarela": "Queijo, mozarela",
-    "queijo minas": "Queijo, minas, frescal",
-    "queijo": "Queijo, prato", # Genérico
-    "parmesão": "Queijo, parmesão", "queijo parmesão": "Queijo, parmesão",
-    "camarão": "Camarão, Rio Grande, grande, cru",
-    "linguiça": "Lingüiça, porco, crua", "linguiça calabresa": "Lingüiça, porco, frita",
-    "linguiça tipo paio": "Lingüiça, porco, frita",
+    "farelo de aveia": "Aveia, flocos, crua", "farinha de aveia": "Aveia, flocos, crua", "goiabada": "Goiaba, doce, cascão",
+    "farinha de trigo refinada": "Farinha, de trigo", "pao de lo": "Bolo, pronto, simples", "sal grosso": "Tempero a base de sal",
+    "salsichas": "Salsicha, viena, enlatada", "sonho de valsa": "Chocolate, ao leite", "sorvete": "sorvete, massa, baunilha",
+    "licor": "Cana, aguardente 1", "massa para salgados assados": "Pastel, massa, crua", "queijo mussarela": "Queijo, mozarela",
+    "mussarela": "Queijo, mozarela", "queijo minas": "Queijo, minas, frescal", "queijo": "Queijo, prato", "parmesão": "Queijo, parmesão",
+    "queijo parmesão": "Queijo, parmesão", "camarão": "Camarão, Rio Grande, grande, cru", "linguiça": "Lingüiça, porco, crua",
+    "linguiça calabresa": "Lingüiça, porco, frita", "linguiça tipo paio": "Lingüiça, porco, frita",
     "milho verde": "Milho, verde, enlatado, drenado", "milho": "Milho, verde, enlatado, drenado",
     "uva-passa": "Uva, suco concentrado, envasado", "passas brancas": "Uva, suco concentrado, envasado",
-    "carne desfiada": "Carne, bovina, charque, cozido",
-    "farinha de milho branco": "Farinha, de milho, amarela",
-    "frango": "Frango, filé, à milanesa", "atum": "Atum, conserva em óleo",
-    "maçã": "Maçã, Fuji, com casca, crua", "noz": "Noz, crua", "nozes": "Noz, crua",
-    "arroz branco": "Arroz, tipo 1, cozido", "arroz": "Arroz, tipo 1, cozido",
-    "requeijão cremoso": "Queijo, requeijão, cremoso",
-    "cheiro verde": "Salsa, crua", "extrato ou massa de tomate": "Tomate, extrato",
+    "carne desfiada": "Carne, bovina, charque, cozido", "farinha de milho branco": "Farinha, de milho, amarela",
+    "frango": "Frango, filé, à milanesa", "atum": "Atum, conserva em óleo", "maçã": "Maçã, Fuji, com casca, crua",
+    "noz": "Noz, crua", "nozes": "Noz, crua", "arroz branco": "Arroz, tipo 1, cozido", "arroz": "Arroz, tipo 1, cozido",
+    "requeijão cremoso": "Queijo, requeijão, cremoso", "cheiro verde": "Salsa, crua", "extrato ou massa de tomate": "Tomate, extrato",
     "molho de tomada": "Tomate, molho industrializado",
 }
-
 MAPEAMENTO_TACO_NORMALIZADO = {''.join(c for c in unicodedata.normalize('NFD', k) if unicodedata.category(c) != 'Mn'): v for k, v in MAPEAMENTO_TACO.items()}
 
+# --- FUNÇÃO DA API ATUALIZADA ---
 def buscar_nutrientes_com_gemini(nome_ingrediente: str, cursor):
     print(f"      -> TACO falhou. Consultando a IA sobre '{nome_ingrediente}'...")
     model = genai.GenerativeModel('models/gemini-flash-latest')
+    prompt = f'Forneça uma estimativa dos dados nutricionais para 100g de "{nome_ingrediente}", com base em alimentos comuns no Brasil. Os nutrientes que preciso são: "calorias" (kcal), "proteina" (g), "lipideos" (g), "carboidratos" (g), e "fibras" (g). Retorne APENAS o objeto JSON. Exemplo: {{"calorias": 123.4, "proteina": 5.6, "lipideos": 7.8, "carboidratos": 9.0, "fibras": 1.2}}'
     
-    prompt = f'''
-    Forneça uma estimativa dos dados nutricionais para 100g de "{nome_ingrediente}", com base em alimentos comuns no Brasil.
-    Os nutrientes que preciso são: "calorias" (kcal), "proteina" (g), "lipideos" (g), "carboidratos" (g), e "fibras" (g).
-    Retorne APENAS o objeto JSON, sem nenhum texto adicional, markdown ou explicação. Exemplo:
-    {{"calorias": 123.4, "proteina": 5.6, "lipideos": 7.8, "carboidratos": 9.0, "fibras": 1.2}}
-    '''
     try:
-        time.sleep(4.5)
+        time.sleep(1.1) # Movido para antes da chamada para garantir a pausa
         response = model.generate_content(prompt)
-        
         match = re.search(r'\{.*\}', response.text, re.DOTALL)
         if not match:
             raise ValueError("Resposta da IA não contém um JSON válido.")
@@ -155,8 +143,9 @@ def buscar_nutrientes_com_gemini(nome_ingrediente: str, cursor):
             nome_ingrediente, dados_nutricionais.get('calorias'), dados_nutricionais.get('proteina'),
             dados_nutricionais.get('lipideos'), dados_nutricionais.get('carboidratos'), dados_nutricionais.get('fibras')
         ))
-        print(f"      -> IA respondeu. Resultado preparado para salvar.")
         return pd.Series(dados_nutricionais)
+    except google_exceptions.ResourceExhausted as e:
+        raise QuotaExceededError(f"Cota da API do Gemini excedida: {e}")
     except Exception as e:
         print(f"          -> Erro na consulta de nutrientes à IA: {e}")
         return None
@@ -168,14 +157,12 @@ def encontrar_alimento_na_taco(nome_ingrediente: str, df_taco, cursor):
     cursor.execute("SELECT calorias, proteina, lipideos, carboidratos, fibras FROM taco_complementar WHERE alimento = ?", (nome_ingrediente,))
     resultado_cache = cursor.fetchone()
     if resultado_cache:
-        print(f"   -> Encontrado '{nome_ingrediente}' no banco de dados complementar (cache).")
+        # Silenciando este print para reduzir o output
+        # print(f"   -> Encontrado '{nome_ingrediente}' no banco de dados complementar (cache).")
         return pd.Series(dict(zip(['calorias', 'proteina', 'lipideos', 'carboidratos', 'fibras'], resultado_cache)))
 
     nome_mapeado = MAPEAMENTO_TACO_NORMALIZADO.get(nome_normalizado)
-    if nome_mapeado:
-        nome_final_busca = ''.join(c for c in unicodedata.normalize('NFD', nome_mapeado.lower()) if unicodedata.category(c) != 'Mn')
-    else:
-        nome_final_busca = nome_normalizado
+    nome_final_busca = ''.join(c for c in unicodedata.normalize('NFD', nome_mapeado.lower()) if unicodedata.category(c) != 'Mn') if nome_mapeado else nome_normalizado
 
     if nome_final_busca in df_taco.index:
         return df_taco.loc[nome_final_busca]
@@ -194,12 +181,11 @@ def converter_para_gramas(ingrediente: dict):
     if quantidade is None: return 0.0
     try:
         quantidade = float(quantidade)
-    except (ValueError, TypeError):
-        return 0.0
+    except (ValueError, TypeError): return 0.0
         
     if unidade in ['g', 'gramas']: return quantidade
     if unidade in ['kg', 'quilos']: return quantidade * 1000
-    if unidade in ['ml']: return quantidade
+    if unidade in ['ml']: return quantidade # Assumindo densidade 1g/ml
     if unidade in ['l', 'litros']: return quantidade * 1000
     
     if nome and unidade:
@@ -207,13 +193,13 @@ def converter_para_gramas(ingrediente: dict):
         peso = CONVERSOES_PARA_GRAMAS_NORMALIZADO.get((nome_normalizado, unidade))
         if peso is not None: return quantidade * peso
         
-        peso = CONVERSOES_PARA_GRAMAS_NORMALIZADO.get(('generico', unidade))
+        peso = CONVERSOES_PARA_GRAMAS_NORMALIZADO.get(('genérico', unidade))
         if peso is not None: return quantidade * peso
         
-    print(f"   -> AVISO: Não foi encontrada conversão para '{ingrediente.get('quantidade')} {ingrediente.get('unidade')}' de {nome}.")
+    # Silenciando o aviso de conversão para reduzir output
+    # print(f"   -> AVISO: Não foi encontrada conversão para '{ingrediente.get('quantidade')} {ingrediente.get('unidade')}' de {nome}.")
     return 0.0
 
-# --- FUNÇÃO ATUALIZADA COM A VERIFICAÇÃO DE INGREDIENTE NULO ---
 def calcular_nutrientes_receita(receita_id: int, cursor, df_taco):
     cursor.execute("SELECT * FROM ingredientes_estruturados WHERE receita_id = ?", (receita_id,))
     ingredientes = [dict(zip([column[0] for column in cursor.description], row)) for row in cursor.fetchall()]
@@ -223,32 +209,27 @@ def calcular_nutrientes_receita(receita_id: int, cursor, df_taco):
     blacklist_pattern = r'\b(' + '|'.join(re.escape(term) for term in BLACKLISTA_IGNORAR) + r')\b'
     
     for ing in ingredientes:
-        # Verifica se o nome do ingrediente é nulo ou vazio antes de continuar
         if not ing['nome_ingrediente']:
-            print(f"   -> AVISO: Encontrado um ingrediente sem nome na receita ID {receita_id}. Pulando.")
-            continue # Pula para o próximo ingrediente
+            continue
 
         nome_ingrediente_lower = ing['nome_ingrediente'].lower()
         if re.search(blacklist_pattern, nome_ingrediente_lower):
-            print(f"   -> Ignorando ingrediente não relevante: '{ing['nome_ingrediente']}'")
             continue
 
         peso_em_gramas = converter_para_gramas(ing)
         if peso_em_gramas > 0:
             dados_taco = encontrar_alimento_na_taco(ing['nome_ingrediente'], df_taco, cursor)
-            if dados_taco is not None:
+            if dados_taco is not None and not dados_taco.empty:
                 fator = peso_em_gramas / 100.0
                 for nutriente in totais.keys():
                     if nutriente in dados_taco and pd.notna(dados_taco[nutriente]):
                         try:
                             totais[nutriente] += float(dados_taco[nutriente]) * fator
-                        except (ValueError, TypeError):
-                            continue
+                        except (ValueError, TypeError): continue
             else:
-                print(f"   -> AVISO FINAL: Ingrediente '{ing['nome_ingrediente']}' não encontrado. Receita será pulada.")
+                # Se não encontrar o ingrediente, a receita inteira falha
                 return None, False
     return totais, True
-
 
 def salvar_nutrientes_no_banco(receita_id: int, totais: dict, cursor):
     cursor.execute("""
@@ -260,108 +241,66 @@ def salvar_nutrientes_no_banco(receita_id: int, totais: dict, cursor):
         totais['carboidratos'], totais['fibras']
     ))
     cursor.execute("UPDATE receitas SET nutrientes_calculados = 1 WHERE id = ?", (receita_id,))
-    print(f"✔️ Nutrientes da receita {receita_id} preparados para salvar.")
 
-
-# --- BLOCO PRINCIPAL TOTALMENTE REFEITO ---
+# --- BLOCO PRINCIPAL ATUALIZADO ---
 if __name__ == "__main__":
-    # 2. CONFIGURA O PARSER DE ARGUMENTOS
     parser = argparse.ArgumentParser(description="Calcula os nutrientes de receitas no banco de dados NutriAI.")
-    parser.add_argument(
-        '-m', '--mode',
-        choices=['new', 'all', 'range'],
-        default='new',
-        help="Modo de execução: 'new' (apenas novas), 'all' (reprocessa todas), 'range' (IDs específicos)."
-    )
-    parser.add_argument(
-        '-l', '--limit',
-        type=int,
-        default=None,
-        help="Limita o número de receitas a serem processadas."
-    )
-    parser.add_argument(
-        'ids',
-        nargs='*', # 0 ou mais argumentos
-        type=int,
-        help="IDs ou intervalo de IDs para o modo 'range' (ex: 42 ou 50 100)."
-    )
+    parser.add_argument('-m', '--mode', choices=['new', 'all', 'range'], default='new', help="Modo de execução.")
+    parser.add_argument('-l', '--limit', type=int, default=None, help="Limita o número de receitas a processar.")
+    parser.add_argument('ids', nargs='*', type=int, help="IDs ou intervalo para o modo 'range'.")
     args = parser.parse_args()
 
-    # CARREGA A TABELA TACO
     tabela_taco_df = carregar_tabela_taco()
-    if tabela_taco_df is None:
-        exit()
+    if tabela_taco_df is None: exit()
 
-    # ABRE A CONEXÃO COM O BANCO
-    conn = sqlite3.connect(ARQUIVO_BANCO)
+    conn = sqlite3.connect(ARQUIVO_BANCO, timeout=10) # Timeout aumentado
     try:
         cursor = conn.cursor()
-
-        # 3. CONSTRÓI A CONSULTA SQL COM BASE NOS ARGUMENTOS
         query_base = "SELECT id, titulo FROM receitas"
         params = []
         
         if args.mode == 'all':
-            print("\nAVISO: O script está configurado para reprocessar TODAS as receitas.")
-            cursor.execute("UPDATE receitas SET nutrientes_calculados = 0")
-            conn.commit()
             where_clause = " WHERE processado_pela_llm = 1"
-        
         elif args.mode == 'new':
-            print("\nModo 'new': Processando apenas receitas não calculadas.")
             where_clause = " WHERE processado_pela_llm = 1 AND nutrientes_calculados = 0"
-        
         elif args.mode == 'range':
-            if not args.ids:
-                print("ERRO: O modo 'range' requer pelo menos um ID.")
-                exit()
+            if not args.ids: print("ERRO: O modo 'range' requer IDs."); exit()
             elif len(args.ids) == 1:
-                print(f"\nModo 'range': Processando receita com ID = {args.ids[0]}")
-                where_clause = " WHERE id = ?"
-                params.append(args.ids[0])
+                where_clause = " WHERE id = ?"; params.append(args.ids[0])
             else:
                 start_id, end_id = sorted(args.ids)[:2]
-                print(f"\nModo 'range': Processando receitas no intervalo de ID {start_id} a {end_id}")
-                where_clause = " WHERE id BETWEEN ? AND ?"
-                params.extend([start_id, end_id])
+                where_clause = " WHERE id BETWEEN ? AND ?"; params.extend([start_id, end_id])
         
-        limit_clause = ""
-        if args.limit:
-            limit_clause = " LIMIT ?"
-            params.append(args.limit)
+        limit_clause = " LIMIT ?" if args.limit else ""; 
+        if args.limit: params.append(args.limit)
 
-        # MONTA E EXECUTA A CONSULTA FINAL
         final_query = query_base + where_clause + limit_clause
         cursor.execute(final_query, params)
         receitas_para_calcular = cursor.fetchall()
         
         if not receitas_para_calcular:
-            print("\nNenhuma receita encontrada para os critérios especificados.")
+            print("\nNenhuma receita nova para calcular.")
         else:
             print(f"\nEncontradas {len(receitas_para_calcular)} receitas para calcular os nutrientes.")
         
-        # 4. LOOP DE PROCESSAMENTO (IDÊNTICO AO ANTERIOR)
-        for receita_id, titulo in receitas_para_calcular:
-            print(f"\n--- Calculando nutrientes para: '{titulo}' (ID: {receita_id}) ---")
-            
+        # Loop com barra de progresso
+        for receita_id, titulo in tqdm(receitas_para_calcular, desc="Calculando Nutrientes"):
             totais_nutricionais, sucesso = calcular_nutrientes_receita(receita_id, cursor, tabela_taco_df)
             
             if sucesso and totais_nutricionais is not None:
                 salvar_nutrientes_no_banco(receita_id, totais_nutricionais, cursor)
                 conn.commit()
-                print(f"--- SUCESSO: Receita '{titulo}' foi salva permanentemente no banco! ---")
             elif not sucesso:
-                print(f"--- FALHA: Alterações para a receita '{titulo}' foram descartadas (rollback). ---")
+                # O rollback já não é mais necessário aqui se a falha for por API
                 conn.rollback()
-            else: 
-                conn.commit() 
-                print(f"--- SUCESSO: Receita '{titulo}' processada (sem ingredientes a calcular) e salva. ---")
 
+    except QuotaExceededError as e:
+        print(f"\n!!! ATENÇÃO: Cota da API excedida. O script será interrompido. !!!")
+        print(f"Detalhes: {e}")
     except Exception as e_geral:
         print(f"❌ Ocorreu um erro geral e o script PAROU: {e_geral}")
         import traceback
         traceback.print_exc()
     finally:
-        if conn:
             conn.close()
             print("\nProcesso de cálculo de nutrientes concluído.")
