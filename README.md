@@ -1,127 +1,165 @@
 # NutriAI: Plataforma Inteligente de Nutrição e Receitas
 
-[![Status do Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/usuario/nutriai)
-[![Licença](https://img.shields.io/badge/license-MIT-blue)](https://github.com/usuario/nutriai/blob/main/LICENSE)
+[![Status do Build](https://img.shields.io/badge/build-passing-brightgreen)](https://github.com/Kamuratt/NutriIA)
+[![Tecnologia](https://img.shields.io/badge/powered%20by-Docker-blue?logo=docker)](https://www.docker.com/)
 
-Uma plataforma de dados que utiliza web scraping, LLMs e análise nutricional para criar um banco de dados único de receitas brasileiras, alimentando uma API para aplicações inteligentes e ultra-personalizadas.
+**NutriAI** é uma plataforma de engenharia de dados de ponta a ponta, projetada para transformar a maneira como as pessoas interagem com a culinária e a nutrição. O sistema automatiza a coleta, estruturação, enriquecimento e disponibilização de receitas brasileiras, criando um ativo de dados único e de alto valor para aplicações inteligentes.
 
-## Índice
+---
 
-1.  [Visão Geral do Projeto](#1-visão-geral-do-projeto)
-2.  [O Problema a Ser Resolvido](#2-o-problema-a-ser-resolvido)
-3.  [A Solução Proposta](#3-a-solução-proposta)
-4.  [Arquitetura e Stack Tecnológico](#4-arquitetura-e-stack-tecnológico)
-5.  [Instalação e Configuração](#5-instalação-e-configuração)
-6.  [Como Usar](#6-como-usar)
-7.  [Roadmap de Desenvolvimento](#7-roadmap-de-desenvolvimento)
-8.  [Como Contribuir](#8-como-contribuir)
+## O Problema
 
-## 1. Visão Geral do Projeto
+No cenário digital atual, as ferramentas de receitas e nutrição são frequentemente genéricas e fragmentadas, resultando em uma experiência de usuário insatisfatória:
 
-NutriAI é um sistema de software projetado para transformar a maneira como as pessoas interagem com receitas e nutrição. Ele utiliza web scraping para coletar receitas brasileiras da web, processamento de linguagem natural (LLM) para extrair e estruturar os dados, e análise nutricional para enriquecer cada receita com informações detalhadas. O resultado final é um banco de dados único e poderoso que alimenta uma aplicação inteligente, capaz de oferecer recomendações de refeições ultra-personalizadas, planejamento de cardápios e muito mais.
+-   **Conteúdo Não-Localizado:** A maioria das bases de dados de receitas é internacional, ignorando a riqueza da cultura, dos ingredientes e dos sabores do Brasil.
+-   **Análise Nutricional Manual:** Receitas online raramente incluem informações nutricionais precisas, forçando usuários com metas de saúde a realizar cálculos manuais tediosos e propensos a erros.
+-   **Desperdício de Alimentos:** A dificuldade em encontrar receitas com base nos ingredientes já disponíveis em casa leva ao descarte de alimentos e ao desperdício de dinheiro.
+-   **Busca Simplista:** As ferramentas de busca de receitas ainda são baseadas em palavras-chave, sem uma compreensão real do contexto, das preferências ou das restrições do usuário.
 
-## 2. O Problema a Ser Resolvido
+## A Solução Proposta
 
-No cenário atual, ferramentas de receitas e nutrição são fragmentadas e genéricas:
+NutriAI aborda esses problemas através de um pipeline de dados automatizado e uma arquitetura de microsserviços desacoplada, entregando dados de alta qualidade via API para aplicações inteligentes.
 
--   **Conteúdo Genérico:** A maioria dos aplicativos usa bases de dados de receitas internacionais, que não refletem a cultura e os ingredientes locais do Brasil.
--   **Falta de Dados Nutricionais:** Receitas online raramente vêm com informações nutricionais precisas, tornando o planejamento de dietas um processo manual e tedioso.
--   **Desperdício de Alimentos:** As pessoas frequentemente não sabem o que cozinhar com os ingredientes que já têm em casa, levando ao desperdício de comida e dinheiro.
--   **Interfaces Pouco Inteligentes:** A busca por receitas ainda é baseada em palavras-chave simples, sem entender o verdadeiro contexto ou preferência do usuário.
+1.  **Coleta Automatizada (Web Scraping):** Um scraper robusto em Python varre fontes populares de receitas brasileiras para construir um *data lake* de pratos autênticos e relevantes.
+2.  **Estruturação Inteligente (LLM Parsing):** Modelos de Linguagem de Grande Porte (LLMs) processam o texto bruto de cada receita, extraindo ingredientes, quantidades, unidades e passos de preparo em um formato JSON padronizado e limpo.
+3.  **Enriquecimento de Dados (Análise Nutricional):** Um script cruza os ingredientes extraídos com a **Tabela Brasileira de Composição de Alimentos (TACO)** para calcular, com alta precisão, o perfil nutricional completo de cada prato (calorias, macronutrientes, etc.).
+4.  **Serviço e Visualização (API & Frontend):** Uma API RESTful expõe essa base de dados enriquecida, permitindo que aplicações, como o nosso dashboard interativo em Streamlit, façam consultas complexas e inteligentes.
 
-## 3. A Solução Proposta
+---
 
-NutriAI resolve esses problemas através de um pipeline de dados automatizado e uma API inteligente.
+## Arquitetura do Sistema
 
-1.  **Coleta (Scraping):** Um scraper em Python varre fontes populares de receitas brasileiras (TudoGostoso, Panelinha, etc.) para construir um data lake de receitas autênticas.
-2.  **Estruturação (LLM Parsing):** Uma Large Language Model (LLM) processa o texto bruto de cada receita, extraindo ingredientes, quantidades, unidades e passos de preparo em um formato JSON estruturado e padronizado.
-3.  **Enriquecimento (Nutritional Analysis):** Um script cruza os ingredientes extraídos com a **Tabela Brasileira de Composição de Alimentos (TACO)** para calcular, com alta precisão, o perfil nutricional completo de cada prato (calorias, proteínas, gorduras, carboidratos).
-4.  **Serviço (API):** Uma API RESTful expõe essa base de dados enriquecida, permitindo que aplicações (web, mobile) façam consultas complexas e inteligentes.
+O projeto é orquestrado em uma arquitetura de microsserviços gerenciada via Docker Compose. Essa abordagem garante que cada componente seja independente, escalável e fácil de manter.
 
-## 4. Arquitetura e Stack Tecnológico
+```mermaid
+graph TD
+    subgraph "Fontes Externas"
+        A["Sites de Receitas Brasileiras"]
+        B["API de LLM <br>(Google Gemini/OpenAI)"]
+    end
 
--   **Linguagem:** Python
--   **Coleta de Dados:** Scrapy / BeautifulSoup, Cloudscraper
--   **Processamento de Dados:** Pandas, spaCy (para NLP auxiliar)
--   **Inteligência Artificial:** APIs do Google Gemini ou OpenAI (GPT-4)
--   **Banco de Dados Nutricional:** Tabela TACO (processada)
--   **Banco de Dados Principal:** PostgreSQL ou MongoDB
--   **API:** FastAPI
--   **Infraestrutura:** Docker, com potencial deploy em Render, Heroku ou AWS/GCP.
+    subgraph "Pipeline de Dados (Orquestrado por n8n)"
+        C["1. Scraper <br>(Python/Cloudscraper)"]
+        D["2. Estruturação <br>(Chamada à LLM)"]
+        E["3. Enriquecimento Nutricional <br>(Script Python + Tabela TACO)"]
+    end
 
-## 5. Instalação e Configuração
+    subgraph "Plataforma NutriAI"
+        F["Banco de Dados <br>(PostgreSQL)"]
+        G["API <br>(FastAPI)"]
+        H["Aplicação Web <br>(Streamlit)"]
+        I["Orquestrador <br>(n8n)"]
+    end
+    
+    J["Usuário Final"]
 
-Para executar este projeto localmente, siga os passos abaixo:
+    A --> C
+    C --> D
+    B --> D
+    D --> E
+    E --> F
+    F <--> G
+    G <--> H
+    J <--> H
+    I -- "Gerencia e agenda" --> C
+```
 
-1.  **Clone o repositório:**
+O fluxo de dados é totalmente automatizado: o **n8n** agenda e executa o **scraper**, que coleta os dados brutos. Em seguida, o mesmo workflow orquestra a chamada à **API da LLM** para estruturação e ao script de **enriquecimento nutricional**, persistindo o resultado final no banco de dados **PostgreSQL**. A **API FastAPI** serve esses dados para a aplicação **Streamlit**, onde o usuário pode interagir com as receitas.
+
+---
+
+## Stack Tecnológico
+
+A seleção de tecnologias foi feita para garantir performance, escalabilidade e uma excelente experiência de desenvolvimento.
+
+-   **Backend & API:** **FastAPI**
+    -   *Por quê?* Pela sua alta performance assíncrona, validação de dados nativa com Pydantic e geração automática de documentação interativa (Swagger UI).
+-   **Frontend:** **Streamlit**
+    -   *Por quê?* Permite a prototipagem e construção rápida de aplicações de dados interativas com Python puro, ideal para visualização e interação com a API.
+-   **Orquestração de Workflows:** **n8n**
+    -   *Por quê?* Uma ferramenta *low-code* poderosa para automação de pipelines. Permite visualizar, agendar e gerenciar o fluxo de dados de forma intuitiva.
+-   **Banco de Dados:** **PostgreSQL**
+    -   *Por quê?* Um banco de dados relacional robusto, confiável e com excelente suporte para tipos de dados complexos como JSON, ideal para armazenar as receitas estruturadas.
+-   **Inteligência Artificial:** **APIs do Google Gemini / OpenAI**
+    -   *Por quê?* Modelos de ponta para tarefas de Processamento de Linguagem Natural, capazes de extrair informações de texto não-estruturado com alta precisão.
+-   **Infraestrutura:** **Docker & Docker Compose**
+    -   *Por quê?* Para criar um ambiente de desenvolvimento e produção consistente, reprodutível e isolado, simplificando o setup e o deploy.
+
+---
+
+## Estrutura do Projeto
+
+O repositório está organizado da seguinte forma para manter a clareza e a separação de responsabilidades:
+
+```
+.
+├── api/             # Lógica do backend e serviço da API com FastAPI
+├── data/            # Arquivos de dados, como a Tabela TACO processada
+├── n8n/             # Configurações e workflows do n8n
+├── scripts/         # Scripts independentes (scraper, enriquecimento, etc.)
+├── streamlit-app/   # Código da aplicação frontend com Streamlit
+├── .env.example     # Template para variáveis de ambiente
+├── docker-compose.yml # Orquestração de todos os serviços
+└── README.md        # Esta documentação
+```
+
+---
+
+## Guia de Instalação e Uso
+
+O projeto é 100% conteinerizado. Siga os passos abaixo para executar a plataforma completa localmente.
+
+1.  **Pré-requisitos:**
+    * [Docker](https://www.docker.com/get-started) e [Docker Compose](https://docs.docker.com/compose/install/) instalados.
+    * [Git](https://git-scm.com/) para clonar o repositório.
+
+2.  **Clonagem do Repositório:**
     ```bash
-    git clone [https://github.com/seu-usuario/nutriai.git](https://github.com/seu-usuario/nutriai.git)
-    cd nutriai
+    git clone [https://github.com/Kamuratt/NutriIA.git](https://github.com/Kamuratt/NutriIA.git)
+    cd NutriIA
     ```
 
-2.  **Crie e ative um ambiente virtual:**
+3.  **Configuração do Ambiente:**
+    * Crie uma cópia do arquivo de exemplo `.env.example` e renomeie para `.env`.
+    * Edite o arquivo `.env` e preencha as variáveis de ambiente, especialmente sua chave de API para a LLM (`GEMINI_API_KEY`).
+
+4.  **Execução da Plataforma:**
     ```bash
-    python -m venv venv
-    source venv/bin/activate  # No Windows, use `venv\Scripts\activate`
+    docker-compose up --build
     ```
+    Este comando irá construir as imagens Docker (na primeira vez) e iniciar todos os contêineres de forma integrada.
 
-3.  **Instale as dependências:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+5.  **Acesso aos Serviços:**
+    * **Aplicação Web (Frontend):** `http://localhost:8501`
+    * **Documentação da API (Swagger):** `http://localhost:8000/docs`
+    * **Painel de Automação (n8n):** `http://localhost:5678`
 
-4.  **Configure as variáveis de ambiente:**
-    - Renomeie o arquivo `.env.example` para `.env`.
-    - Preencha as variáveis necessárias, como chaves de API (OpenAI/Gemini) e credenciais do banco de dados.
+---
 
-## 6. Como Usar
+## Roadmap de Desenvolvimento
 
-Após a instalação, você pode executar os diferentes módulos do projeto.
+Nosso plano de desenvolvimento está focado em transformar o protótipo funcional em um produto de dados robusto, confiável e com funcionalidades inteligentes.
 
--   **Para iniciar a API:**
-    ```bash
-    uvicorn app.main:app --reload
-    ```
-    Acesse a documentação interativa em `http://127.0.0.1:8000/docs`.
+### Fase 1: Fundação e MVP (Concluída ✅)
+-   [x] Desenvolvimento do Scraper e pipeline de dados inicial.
+-   [x] Integração com LLM para estruturação de receitas.
+-   [x] Implementação da API base e do banco de dados.
+-   [x] Conteinerização completa da aplicação com Docker.
+-   [x] Automação do pipeline com workflows no n8n.
+-   [x] Criação de um frontend interativo com Streamlit.
 
--   **Para executar o scraper:**
-    ```bash
-    python scripts/run_scraper.py --site tudogostoso --pages 10
-    ```
+### Fase 2: Robustez e Qualidade de Dados (Foco Atual 🎯)
+O objetivo desta fase é tornar o pipeline à prova de falhas e garantir a máxima qualidade e consistência dos dados.
+-   [ ] **Validação de Dados:** Implementar `Pydantic` de forma estrita na API para garantir a integridade dos dados que entram e saem do sistema.
+-   [ ] **Logging Estruturado:** Substituir `print()` por um sistema de logging robusto (ex: módulo `logging` do Python) para monitorar e depurar os serviços de forma eficaz.
+-   [ ] **Normalização de Ingredientes:** Criar um módulo para padronizar nomes de ingredientes (ex: "tomate cereja" -> "tomate") antes da análise nutricional para aumentar a precisão.
 
-## 7. Roadmap de Desenvolvimento
+### Fase 3: Otimização e Escalabilidade (Próximos Passos 🚀)
+-   [ ] **Implementar Cache:** Evitar reprocessamento de receitas já analisadas para economizar custos de API e tempo de processamento.
+-   [ ] **Desenvolver Scraping Incremental:** Refinar o scraper para buscar apenas por conteúdo novo ou atualizado, tornando a coleta mais eficiente.
+-   [ ] **Adicionar Testes Automatizados:** Implementar testes unitários e de integração com `pytest` para garantir a estabilidade do código.
 
-### Fase 1: Fundação de Dados (MVP) - (Foco Atual)
-O objetivo desta fase é construir o ativo principal: a base de dados.
-
--   [x] Limpeza da Base Nutricional: Processar e limpar a Tabela TACO.
--   [ ] Desenvolvimento do Scraper: Criar um scraper para ao menos um grande portal de receitas.
--   [ ] Desenvolvimento do Pipeline de Enriquecimento:
-    -   [ ] Criar o script que usa a LLM para extrair ingredientes.
-    -   [ ] Criar o script que calcula os valores nutricionais com base na Tabela TACO.
--   [ ] API Básica: Criar um endpoint simples para consultar as receitas processadas.
-
-### Fase 2: Módulos de Inteligência (Recursos Futuros)
-Com a fundação pronta, o projeto pode evoluir com os seguintes módulos:
-
-#### Módulo 1: Desperdício Zero ♻️
--   **Funcionalidade:** O usuário informa os ingredientes que tem na geladeira e o sistema gera um plano de refeições para a semana, maximizando o uso desses itens e minimizando o desperdício.
--   **Diferencial:** Apelo econômico e ecológico direto.
-
-#### Módulo 2: Paladar Personalizado (Flavor DNA) 🧬
--   **Funcionalidade:** O sistema aprende o perfil de sabor do usuário (picante, ácido, cremoso) e recomenda receitas com base na compatibilidade de paladar.
--   **Diferencial:** Hiper-personalização que cria uma conexão emocional com o usuário.
-
-#### Módulo 3: Planejador Contextual 🧠
--   **Funcionalidade:** Conecta-se a dados externos (calendário, clima) para fazer sugestões proativas. Ex: "Dia frio, que tal uma sopa de lentilhas?".
--   **Diferencial:** Transforma o app de uma ferramenta reativa para um assistente proativo.
-
-## 8. Como Contribuir
-
-Contribuições são bem-vindas! Se você tem ideias para melhorias ou encontrou algum bug, sinta-se à vontade para:
-
-1.  Fazer um "Fork" do projeto.
-2.  Criar uma nova "Branch" (`git checkout -b feature/sua-feature`).
-3.  Fazer o "Commit" das suas alterações (`git commit -m 'Adiciona nova feature'`).
-4.  Fazer o "Push" para a Branch (`git push origin feature/sua-feature`).
-5.  Abrir um "Pull Request".
+### Fase 4: Expansão da Inteligência (Features Futuras 💡)
+-   [ ] **Módulo "Desperdício Zero":** Funcionalidade para o usuário inserir os ingredientes que possui e receber um plano de refeições otimizado.
+-   [ ] **Módulo "Paladar Personalizado":** Sistema de recomendação que aprende as preferências do usuário para sugerir novas receitas.
+-   [ ] **CI/CD:** Configurar um pipeline de Integração e Deploy Contínuos com GitHub Actions para automatizar os testes e o deploy.
