@@ -1,22 +1,69 @@
+# C:\GitHub\NutriIA\docker-compose.yml
 services:
-  # Serviço 1: Sua aplicação NutriAI
-  nutriai-app:
-    build: . # Constrói a imagem usando o Dockerfile da pasta atual
-    container_name: nutriai_container
+  api:
+    build: ./nutriai/api
+    container_name: nutriai_api
+    ports:
+      - "8000:8000"
     volumes:
-      - ./:/app # Mapeia a pasta atual para /app no contêiner
+      - ./nutriai/api:/app
+    environment:
+      - POSTGRES_HOST=postgres
     env_file:
-      - .env # Carrega as variáveis do arquivo .env
+      - .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
 
-  # Serviço 2: O n8n customizado
+  streamlit:
+    build: ./frontend
+    container_name: nutriai_streamlit
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./frontend:/app
+    environment:
+      - POSTGRES_HOST=postgres
+    env_file:
+      - .env
+    depends_on:
+      - api
+    restart: unless-stopped
+
   n8n:
-    build: ./n8n-custom # Constrói a imagem usando o Dockerfile da pasta n8n-custom
-    container_name: n8n
+    build: ./n8n-custom
+    container_name: nutriai_n8n
     user: root
     ports:
       - "5678:5678"
     volumes:
-      - ./n8n-data:/home/node/.n8n # <-- CORREÇÃO 1: Aponta para a pasta local
+      - n8n_data:/home/node/.n8n
       - /var/run/docker.sock:/var/run/docker.sock
+    env_file:
+      - .env
     depends_on:
-      - nutriai-app # Garante que o n8n só suba depois do nutriai-app
+      - api
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: nutriai_postgres
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      - "${POSTGRES_PORT}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: always
+
+volumes:
+  postgres_data:
+  n8n_data:

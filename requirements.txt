@@ -8,3 +8,4 @@ pandas
 fastapi
 SQLAlchemy
 tqdm
+psycopg2-binary
