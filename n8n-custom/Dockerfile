@@ -1,11 +1,13 @@
-# Começamos com a imagem oficial do n8n como base (que usa Alpine Linux)
+# Começamos com a imagem oficial do n8n como base
 FROM n8nio/n8n
 
-# Trocamos para o usuário 'root' para poder instalar programas
+# Trocamos para o usuário 'root' para poder instalar os pacotes do sistema
 USER root
 
-# Usamos o comando 'apk' (do Alpine) para adicionar o Docker CLI
-RUN apk add --no-cache docker-cli
+# A SOLUÇÃO FINAL:
+# Instalar o Docker CLI e o Docker Compose v2 diretamente pelo apk.
+# Isso é mais limpo e estável do que usar o pip para esta finalidade.
+RUN apk add --no-cache docker-cli docker-compose
 
-# Voltamos para o usuário 'node', que é o usuário padrão e mais seguro do n8n
+# SÓ DEPOIS da instalação, voltamos para o usuário 'node' por segurança
 USER node
