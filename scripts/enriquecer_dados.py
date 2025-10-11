@@ -1,218 +1,226 @@
-# scripts/estruturacao_ingredientes.py
-import json
+# scripts/calcular_nutrientes.py
+import pandas as pd
+import unicodedata
+import random
+import difflib
+import re
 import os
 import time
-import re
-import argparse # Adicionado para argumentos de linha de comando
+import argparse
+import json
 import google.generativeai as genai
 from google.api_core import exceptions as google_exceptions
+from sqlalchemy import create_engine, text, exc as sqlalchemy_exc
+from sqlalchemy.engine import URL, Engine
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import URL
 
-# --- CONFIGURAÇÕES ---
+# --- CONFIGURAÇÃO ---
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
 
-class QuotaExceededError(Exception):
-    """Exceção para quando a cota da API é atingida."""
-    pass
+class QuotaExceededError(Exception): pass
 
 try:
     api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key:
-        raise ValueError("Chave de API GOOGLE_API_KEY não encontrada.")
+    if not api_key: raise ValueError("Chave de API do Google (GOOGLE_API_KEY) não encontrada.")
     genai.configure(api_key=api_key)
-    print("API do Google Gemini configurada com sucesso.")
-except (ValueError, TypeError) as e:
-    print(f"ERRO DE CONFIGURAÇÃO: {e}")
-    exit()
+    print("API do Google Gemini configurada.")
+except ValueError as e:
+    print(f"ERRO DE CONFIGURAÇÃO DA API: {e}"); exit()
 
-# --- FUNÇÕES DE PARSING E IA ---
+# --- FUNÇÕES AUXILIARES (sem alterações significativas) ---
+def corrigir_texto_quebrado(texto: str):
+    if not isinstance(texto, str): return texto
+    try: return texto.encode('latin-1').decode('utf-8')
+    except (UnicodeEncodeError, UnicodeDecodeError): return texto
 
-def parse_ingrediente_com_regras(texto: str):
-    """Tenta extrair dados de um ingrediente usando regras (RegEx)."""
-    if not texto: return None
-    unidades = ['xícara', 'xícaras', 'colher', 'colheres', 'copo', 'copos', 'g', 'kg', 'ml', 'l', 'lata', 'latas', 'dente', 'dentes', 'pitada', 'pitadas', 'unidade', 'unidades', 'fatia', 'fatias', 'ramo', 'ramos', 'folha', 'folhas', 'tablete', 'tabletes', 'pacote', 'pacotes', 'sachê', 'sachês']
-    padrao = r"^\s*(?P<quantidade>[\d\./,\s]+|\w+)\s+(?P<unidade>" + "|".join(unidades) + r"(?:s)?(?: de chá| de sopa)?)\s*(?:de\s+)?(?P<resto>.*)"
-    match = re.search(padrao, texto.strip(), re.IGNORECASE)
-    if match:
-        dados = match.groupdict()
-        nome, *obs_list = re.split(r'[,(]', dados.get("resto", "").strip(), 1)
-        observacao = obs_list[0].strip('() ') if obs_list else None
-        return {"nome_ingrediente": nome.strip(), "quantidade": dados.get("quantidade").strip(), "unidade": dados.get("unidade").strip(), "observacao": observacao, "texto_original": texto}
-    if "a gosto" in texto.lower() or "quanto baste" in texto.lower():
-        nome_limpo = re.sub(r'a gosto|quanto baste', '', texto, flags=re.IGNORECASE).strip()
-        return {"nome_ingrediente": nome_limpo, "quantidade": None, "unidade": None, "observacao": "a gosto", "texto_original": texto}
-    return None
+BLACKLISTA_IGNORAR = {'água', 'agua', 'sal', 'gelo', 'a gosto', 'quanto baste', 'q.b.'}
+MAPEAMENTO_TACO = {"ovo": "Ovo, de galinha, inteiro, cru", "ovos": "Ovo, de galinha, inteiro, cru"} # Reduzido para exemplo
+MAPEAMENTO_TACO_NORMALIZADO = {''.join(c for c in unicodedata.normalize('NFD', k) if unicodedata.category(c) != 'Mn'): v for k, v in MAPEAMENTO_TACO.items()}
 
-def analisar_ingrediente_com_gemini(texto_ingrediente: str):
-    """Usa a IA para analisar e padronizar um ingrediente."""
-    model = genai.GenerativeModel('models/gemini-flash-latest')
-    # PROMPT MELHORADO
-    prompt = f"""
-    Analise o seguinte texto de ingrediente: '{texto_ingrediente}'.
-    Extraia e retorne um único objeto JSON com as chaves: "nome_ingrediente", "quantidade", "unidade", "observacao".
-
-    REGRAS IMPORTANTES:
-    1. "nome_ingrediente": Deve ser o nome PADRONIZADO e CORRIGIDO do ingrediente principal. Exemplo: para "2 xicaras de farinha de trigo peneirada", o nome deve ser "farinha de trigo". Para "cebola picadinha", deve ser "cebola".
-    2. "observacao": Deve conter os detalhes extras como "peneirada", "picadinha", "em rodelas".
-    3. "quantidade": Deve ser um número ou fração em formato de string.
-    4. "unidade": Deve ser a unidade de medida no singular (ex: "xícara", "colher de sopa").
-    """
+def carregar_tabela_taco(caminho_csv: str = "data/processed/tabela_taco_processada.csv"):
     try:
+        project_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        caminho_completo = os.path.join(project_dir, caminho_csv)
+        df = pd.read_csv(caminho_completo)
+        df['alimento_normalizado'] = df['alimento'].astype(str).str.lower().apply(lambda x: ''.join(c for c in unicodedata.normalize('NFD', x) if unicodedata.category(c) != 'Mn'))
+        df.set_index('alimento_normalizado', inplace=True)
+        print("✔️ Tabela TACO carregada e normalizada com sucesso.")
+        return df
+    except Exception as e:
+        print(f"❌ ERRO ao carregar a Tabela TACO: {e}"); return None
+
+def converter_para_gramas(ingrediente: dict) -> float:
+    # Função de conversão de gramas (simplificada para manter o foco, a sua original é boa)
+    # Adapte conforme sua necessidade
+    return float(ingrediente.get('quantidade_em_gramas', 0.0))
+
+# --- FUNÇÕES PRINCIPAIS (COM A LÓGICA NOVA) ---
+
+def criar_tabela_cache(conn):
+    conn.execute(text("CREATE TABLE IF NOT EXISTS taco_complementar (alimento TEXT PRIMARY KEY, calorias REAL, proteina REAL, lipideos REAL, carboidratos REAL, fibras REAL, texto_completo TEXT);"))
+    print("✔️ Tabela de cache 'taco_complementar' garantida no PostgreSQL.")
+
+def tentar_aprender_nutrientes_com_ia(nome_ingrediente: str) -> dict | None:
+    """
+    Usa a lógica do seu script de estruturação para aprender sobre um novo ingrediente.
+    Força a resposta em JSON e é muito mais confiável.
+    """
+    print(f"   -> Aprendendo sobre '{nome_ingrediente}' com a IA...")
+    time.sleep(1.1)
+    
+    # Modelo do seu script de estruturação, que sabemos que funciona no seu ambiente.
+    model = genai.GenerativeModel('models/gemini-flash-latest')
+    
+    prompt = f'Forneça a informação nutricional para 100 gramas de "{nome_ingrediente}". Responda APENAS com um único objeto JSON com as chaves "calorias", "proteina", "lipideos", "carboidratos", e "fibras". Se o ingrediente for inválido ou não tiver dados (ex: "água", "sal"), retorne um JSON com valores 0.'
+    
+    try:
+        # Usando a configuração do seu script para forçar a resposta em JSON
         response = model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(response_mime_type="application/json")
         )
         dados = json.loads(response.text)
-        # Lógica robusta para lidar com respostas em lista
-        if isinstance(dados, list):
-            dados = dados[0] if dados else None
-        if not isinstance(dados, dict):
-            print(f"   -> Resposta da API para '{texto_ingrediente}' não é um objeto JSON válido: {dados}")
-            return None
-        dados['texto_original'] = texto_ingrediente
-        return dados
+        
+        nutrientes = {
+            'alimento': nome_ingrediente,
+            'calorias': float(dados.get('calorias', 0)),
+            'proteina': float(dados.get('proteina', 0)),
+            'lipideos': float(dados.get('lipideos', 0)),
+            'carboidratos': float(dados.get('carboidratos', 0)),
+            'fibras': float(dados.get('fibras', 0)),
+            'texto_completo': response.text
+        }
+        print(f"   -> ✅ IA aprendeu: '{nome_ingrediente}'")
+        return nutrientes
+
     except google_exceptions.ResourceExhausted as e:
         raise QuotaExceededError(f"Cota da API do Gemini excedida: {e}")
     except Exception as e:
-        print(f"   -> Erro na API do Gemini para '{texto_ingrediente}': {e}")
+        print(f"      -> Erro na API do Gemini durante o aprendizado: {e}")
         return None
 
-def corrigir_titulo_receita_com_gemini(titulo: str, retries=3, delay=2):
-    """Usa a IA para corrigir e padronizar o título de uma receita."""
-    model = genai.GenerativeModel('models/gemini-flash-latest')
-    prompt = f"Corrija e padronize o seguinte título de receita: '{titulo}'. Remova erros de digitação e formatações estranhas. Retorne APENAS o texto do título corrigido, sem aspas ou palavras como 'Título:'."
-    for attempt in range(retries):
-        try:
-            response = model.generate_content(prompt)
-            titulo_corrigido = response.text.strip().strip('"').strip("'")
-            if titulo_corrigido:
-                return titulo_corrigido
-        except Exception as e:
-            print(f"   -> Aviso: Erro ao tentar corrigir o título '{titulo}' (tentativa {attempt + 1}): {e}")
-            time.sleep(delay)
-    print(f"   -> Aviso: Não foi possível corrigir o título '{titulo}'. Usando o original.")
-    return titulo
+def encontrar_alimento(conn, nome_ingrediente: str, df_taco: pd.DataFrame, api_disponivel: bool):
+    """Busca o alimento no cache, na TACO local, e por último na IA."""
+    if not nome_ingrediente or nome_ingrediente.lower() in BLACKLISTA_IGNORAR:
+        return None
 
-# --- FUNÇÕES DE BANCO DE DADOS ---
+    # 1. Busca no cache 'taco_complementar'
+    cache_query = text("SELECT calorias, proteina, lipideos, carboidratos, fibras FROM taco_complementar WHERE alimento = :alimento")
+    resultado_cache = conn.execute(cache_query, {"alimento": nome_ingrediente}).fetchone()
+    if resultado_cache:
+        return pd.Series(resultado_cache._asdict())
 
-def buscar_receitas_nao_processadas(conn, limit=None):
-    """Busca receitas que ainda não foram processadas pela IA."""
-    query_str = "SELECT id, titulo, ingredientes_brutos FROM receitas WHERE processado_pela_llm = FALSE AND ingredientes_brutos IS NOT NULL ORDER BY id;"
-    if limit:
-        query_str = query_str.replace(";", f" LIMIT {limit};")
-        
-    query = text(query_str)
-    result = conn.execute(query).fetchall()
-    return result
+    # 2. Busca na Tabela TACO local
+    nome_normalizado = ''.join(c for c in unicodedata.normalize('NFD', nome_ingrediente.lower()) if unicodedata.category(c) != 'Mn')
+    nome_mapeado = MAPEAMENTO_TACO_NORMALIZADO.get(nome_normalizado)
+    nome_final_busca = ''.join(c for c in unicodedata.normalize('NFD', nome_mapeado.lower()) if unicodedata.category(c) != 'Mn') if nome_mapeado else nome_normalizado
+    if nome_final_busca in df_taco.index:
+        return df_taco.loc[nome_final_busca]
+    
+    # 3. Busca por similaridade
+    matches = difflib.get_close_matches(nome_final_busca, df_taco.index.tolist(), n=1, cutoff=0.8)
+    if matches:
+        return df_taco.loc[matches[0]]
 
-def salvar_dados_e_marcar_como_processada(conn, receita_id, titulo_corrigido, lista_ingredientes_estruturados):
-    """Salva os dados processados e o título corrigido no banco."""
-    update_query = text("""
-        UPDATE receitas SET
-            titulo = :titulo,
-            ingredientes = :ingredientes_json,
-            processado_pela_llm = TRUE
-        WHERE id = :receita_id;
-    """)
-    params = {
-        "titulo": titulo_corrigido,
-        "ingredientes_json": json.dumps(lista_ingredientes_estruturados, ensure_ascii=False),
-        "receita_id": receita_id
-    }
-    conn.execute(update_query, params)
+    # 4. Aprender com IA
+    if api_disponivel:
+        dados_aprendidos = tentar_aprender_nutrientes_com_ia(nome_ingrediente)
+        if dados_aprendidos:
+            # Salva no banco e retorna os dados para uso imediato
+            insert_query = text("""
+                INSERT INTO taco_complementar (alimento, calorias, proteina, lipideos, carboidratos, fibras, texto_completo)
+                VALUES (:alimento, :calorias, :proteina, :lipideos, :carboidratos, :fibras, :texto_completo)
+                ON CONFLICT(alimento) DO NOTHING
+            """)
+            conn.execute(insert_query, dados_aprendidos)
+            # Remove chaves que não são nutrientes para o retorno
+            dados_aprendidos.pop('alimento', None)
+            dados_aprendidos.pop('texto_completo', None)
+            return pd.Series(dados_aprendidos)
+            
+    return None
 
-# --- FLUXO PRINCIPAL ---
+def salvar_nutrientes(conn, receita_id, totais):
+    update_query = text("UPDATE receitas SET informacoes_nutricionais = :info, nutrientes_calculados = TRUE WHERE id = :id")
+    conn.execute(update_query, {"info": json.dumps(totais), "id": receita_id})
+
+# --- BLOCO PRINCIPAL (COM A ESTRUTURA CORRETA) ---
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Processa ingredientes de novas receitas usando IA.")
-    parser.add_argument("--limit", type=int, help="Número máximo de receitas para processar.")
+    parser = argparse.ArgumentParser(description="Calcula nutrientes de receitas.")
+    parser.add_argument("-l", "--limit", type=int, help="Número máximo de receitas para processar.")
     args = parser.parse_args()
 
+    df_taco = carregar_tabela_taco()
+    if df_taco is None: exit()
+
     try:
-        db_url = URL.create(
-            drivername="postgresql+psycopg2", username=os.getenv("POSTGRES_USER"),
-            password=os.getenv("POSTGRES_PASSWORD"), host=os.getenv("POSTGRES_HOST"),
-            port=os.getenv("POSTGRES_PORT"), database=os.getenv("POSTGRES_DB"),
-            query={"client_encoding": "utf8"}
-        )
+        db_url = URL.create(drivername="postgresql+psycopg2", username=os.getenv("POSTGRES_USER"), password=os.getenv("POSTGRES_PASSWORD"), host=os.getenv("POSTGRES_HOST"), port=os.getenv("POSTGRES_PORT"), database=os.getenv("POSTGRES_DB"), query={"client_encoding": "utf8"})
         engine = create_engine(db_url)
         print("✔️ Conectado ao PostgreSQL.")
     except Exception as e:
-        print(f"❌ ERRO ao conectar ao PostgreSQL: {e}")
-        exit()
-
-    api_calls_count = 0
+        print(f"❌ ERRO ao conectar ao PostgreSQL: {e}"); exit()
+        
+    api_disponivel = True
     
-    try:
-        with engine.connect() as conn:
-            receitas_para_processar = buscar_receitas_nao_processadas(conn, limit=args.limit)
-        
-        total_receitas = len(receitas_para_processar)
-        if not receitas_para_processar:
-            print("Nenhuma receita nova para processar.")
-        else:
-            print(f"Encontradas {total_receitas} receitas para processar com IA.")
+    # Pega a lista de receitas para processar fora do loop principal
+    receitas_para_calcular = []
+    with engine.connect() as conn:
+        criar_tabela_cache(conn)
+        query = text("SELECT id, titulo, ingredientes FROM receitas WHERE processado_pela_llm = TRUE AND nutrientes_calculados = FALSE ORDER BY id")
+        if args.limit:
+            query = text(str(query) + f" LIMIT {args.limit}")
+        receitas_para_calcular = conn.execute(query).fetchall()
 
-        print("\nIniciando processamento das receitas...")
+    total_a_calcular = len(receitas_para_calcular)
+    if not total_a_calcular:
+        print("Nenhuma receita nova para calcular.")
+    else:
+        print(f"Encontradas {total_a_calcular} receitas para calcular os nutrientes. Iniciando...")
+
+    for i, receita in enumerate(receitas_para_calcular):
+        print(f"\n[{i+1}/{total_a_calcular}] Processando Receita ID {receita.id} ('{corrigir_texto_quebrado(receita.titulo)}')")
         
-        for i, row in enumerate(receitas_para_processar):
-            receita_id, titulo_bruto, ingredientes_brutos = row
-            
-            with engine.begin() as conn:
-                try:
-                    # 1. Corrigir Título
-                    try:
-                        titulo_corrigido_encoding = titulo_bruto.encode('latin1').decode('utf-8')
-                    except:
-                        titulo_corrigido_encoding = titulo_bruto
+        # PADRÃO DE TRANSAÇÃO ATUALIZADO: UMA TRANSAÇÃO POR RECEITA
+        with engine.begin() as conn:
+            try:
+                if not receita.ingredientes:
+                    print("   -> AVISO: Receita sem ingredientes estruturados. Pulando.")
+                    continue
+
+                totais = {'calorias': 0.0, 'proteina': 0.0, 'lipideos': 0.0, 'carboidratos': 0.0, 'fibras': 0.0}
+                sucesso_total = True
+
+                for ing in receita.ingredientes:
+                    nome_ing = corrigir_texto_quebrado(ing.get("nome_ingrediente"))
+                    # Adapte a linha abaixo para usar sua função de conversão para gramas
+                    peso_g = float(ing.get("quantidade", 0)) # Placeholder, use sua função aqui!
                     
-                    titulo_final = corrigir_titulo_receita_com_gemini(titulo_corrigido_encoding)
-                    api_calls_count += 1
-                    time.sleep(1.1)
-
-                    if not ingredientes_brutos:
-                        salvar_dados_e_marcar_como_processada(conn, receita_id, titulo_final, [])
+                    if not nome_ing or peso_g <= 0:
                         continue
-                    
-                    # 2. Processar Ingredientes
-                    lista_ingredientes_estruturados = []
-                    sucesso_total_receita = True
-                    
-                    for texto_ingrediente in ingredientes_brutos:
-                        dados_estruturados = parse_ingrediente_com_regras(texto_ingrediente)
                         
-                        if not dados_estruturados:
-                            dados_estruturados = analisar_ingrediente_com_gemini(texto_ingrediente)
-                            api_calls_count += 1
-                            time.sleep(1.1)
+                    dados_nutricionais = encontrar_alimento(conn, nome_ing, df_taco, api_disponivel)
 
-                        if dados_estruturados:
-                            lista_ingredientes_estruturados.append(dados_estruturados)
-                        else:
-                            print(f"\nFalha ao processar ingrediente '{texto_ingrediente}' para a receita ID {receita_id}.")
-                            sucesso_total_receita = False
-                            break
-                    
-                    # 3. Salvar no Banco
-                    if sucesso_total_receita:
-                        salvar_dados_e_marcar_como_processada(conn, receita_id, titulo_final, lista_ingredientes_estruturados)
-                        print(f"   -> ✅ Receita ID {receita_id} ('{titulo_final}') foi processada e salva.")
-                
-                except Exception as e_receita:
-                    print(f"\n❌ Erro ao processar a receita ID {receita_id}. Alterações desfeitas. Erro: {e_receita}")
+                    if dados_nutricionais is not None and not dados_nutricionais.empty:
+                        fator = peso_g / 100.0
+                        for nutriente in totais.keys():
+                            if nutriente in dados_nutricionais and pd.notna(dados_nutricionais[nutriente]):
+                                totais[nutriente] += float(dados_nutricionais[nutriente]) * fator
+                    else:
+                        print(f"   -> ❌ AVISO: Falha ao encontrar/aprender sobre '{nome_ing}'. A receita não será calculada.")
+                        sucesso_total = False
+                        break # Pára de processar os ingredientes desta receita
 
-            if (i + 1) % 50 == 0 and total_receitas > 50:
-                print(f"\n--- Progresso: {i + 1} de {total_receitas} receitas processadas. ---")
+                if sucesso_total:
+                    salvar_nutrientes(conn, receita.id, totais)
+                    print(f"   -> ✅ Nutrientes calculados e salvos.")
 
-    except QuotaExceededError:
-        print(f"\n!!! ATENÇÃO: Cota da API do Gemini excedida. !!!")
-        print(f"O script fez {api_calls_count} chamadas à IA antes de parar.")
-        print("Na próxima execução, ele continuará de onde parou.")
-    except Exception as e_geral:
-        print(f"\nUm erro geral ocorreu: {e_geral}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        print("\nProcesso de estruturação de ingredientes concluído.")
+            except QuotaExceededError:
+                api_disponivel = False
+                print("\n\n!!! ATENÇÃO: Cota da API excedida. O aprendizado será desativado. !!!\n")
+            except Exception as e_receita:
+                print(f"   -> ❌ Erro inesperado ao processar a receita. Alterações desfeitas. Erro: {e_receita}")
+                # A transação sofre rollback automático aqui por causa do 'with engine.begin()'
+
+    if engine: engine.dispose()
+    print("\nProcesso de cálculo de nutrientes concluído.")

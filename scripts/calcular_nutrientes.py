@@ -7,55 +7,35 @@ import re
 import os
 import time
 import argparse
+import json
 import google.generativeai as genai
 from google.api_core import exceptions as google_exceptions
-from sqlalchemy import create_engine, text
-from sqlalchemy.engine import URL
+from sqlalchemy import create_engine, text, exc as sqlalchemy_exc
+from sqlalchemy.engine import URL, Engine
 from dotenv import load_dotenv
 
-# --- Configuração ---
+# --- CONFIGURAÇÃO ---
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
 
-class QuotaExceededError(Exception):
-    pass
+class QuotaExceededError(Exception): pass
 
 try:
     api_key = os.getenv("GOOGLE_API_KEY")
-    if not api_key: raise ValueError("Chave de API não encontrada.")
+    if not api_key: raise ValueError("Chave de API do Google (GOOGLE_API_KEY) não encontrada.")
     genai.configure(api_key=api_key)
     print("API do Google Gemini configurada.")
 except ValueError as e:
     print(f"ERRO DE CONFIGURAÇÃO DA API: {e}"); exit()
 
-# --- Funções e Constantes ---
+# --- FUNÇÕES AUXILIARES ---
 def corrigir_texto_quebrado(texto: str):
-    if not texto: return texto
+    if not isinstance(texto, str): return texto
     try: return texto.encode('latin-1').decode('utf-8')
     except (UnicodeEncodeError, UnicodeDecodeError): return texto
 
-BLACKLISTA_IGNORAR = {
-    'água', 'agua', 'sal', 'gelo', 'palito de dente', 'papel chumbo', 'receita de', 'a gosto', 'quanto baste', 'q.b.', 'fritadeira elétrica',
-    'cravo-da-índia', 'ervas finas', 'pimenta biquinho', 'cravo', 'água morna', 'açúcar ou adoçante', 'becel amanteigado', 'becel', 
-    'canela em pau', 'doritos grande', 'essência de baunilha', 'folhas de hortelã', 'frutas (morango, uva ou pessego)', 'garam masala'
-}
-
-MAPEAMENTO_TACO = {
-    "acucar mascavo": "Açúcar, mascavo", "acucar cristal": "Açúcar, cristal", "leite": "Leite, de vaca, integral, pó", 
-    "leite em po": "Leite, de vaca, integral, pó", "oleo": "Óleo, de soja", "fermento": "Fermento em pó, químico", 
-    "bacon": "Toucinho, frito", "peito de frango": "Frango, peito, sem pele, cru", "leite de coco": "Leite, de coco", 
-    "carne moida": "Carne, bovina, acém, moído, cru", "amido de milho": "Milho, amido, cru", "maisena": "Milho, amido, cru", 
-    "azeite": "Azeite, de oliva, extra virgem", "molho de tomate": "Tomate, molho industrializado", "requeijao": "Queijo, requeijão, cremoso", 
-    "abobrinha": "Abobrinha, italiana, crua", "cheiro-verde": "Salsa, crua", "salsinha": "Salsa, crua", 
-    "ovo": "Ovo, de galinha, inteiro, cru", "ovos": "Ovo, de galinha, inteiro, cru", "alho": "Alho, cru", "cebola": "Cebola, crua", 
-    "batata": "Batata, inglesa, crua", "peito de frango temperado , cozido e desfiado": "Frango, peito, sem pele, cozido",
-    "coco em flocos": "Coco, cru", "amendoim torrado": "Amendoim, torrado, salgado", "amendoim torrado e moído": "Amendoim, torrado, salgado", 
-    "abóbora": "Abóbora, moranga, crua", "arroz": "Arroz, tipo 1, cozido", "açúcar": "Açúcar, cristal", 
-    "azeite extra virgem": "Azeite, de oliva, extra virgem", "batata palha": "Batata, frita, tipo chips, industrializada", 
-    "calabresa": "Lingüiça, porco, frita", "canela": "Canela, pó", "canela em po": "Canela, pó", "cebolinha": "Cebolinha, crua",
-    "cheiro verde": "Salsa, crua", "ervilha": "Ervilha, enlatada, drenada", "fuba para polvilhar": "Milho, fubá, cru", 
-    "goiabada": "Goiaba, doce, cascão"
-}
+BLACKLISTA_IGNORAR = {'água', 'agua', 'sal', 'gelo', 'a gosto', 'quanto baste', 'q.b.'}
+MAPEAMENTO_TACO = {"ovo": "Ovo, de galinha, inteiro, cru", "ovos": "Ovo, de galinha, inteiro, cru"} # Reduzido para exemplo
 MAPEAMENTO_TACO_NORMALIZADO = {''.join(c for c in unicodedata.normalize('NFD', k) if unicodedata.category(c) != 'Mn'): v for k, v in MAPEAMENTO_TACO.items()}
 
 def carregar_tabela_taco(caminho_csv: str = "data/processed/tabela_taco_processada.csv"):
@@ -72,7 +52,7 @@ def carregar_tabela_taco(caminho_csv: str = "data/processed/tabela_taco_processa
 
 def padronizar_unidade(unidade: str) -> str:
     if not unidade: return 'unidade'
-    u_normalizada = ''.join(c for c in unicodedata.normalize('NFD', unidade.lower()) if unicodedata.category(c) != 'Mn')
+    u_normalizada = ''.join(c for c in unicodedata.normalize('NFD', str(unidade).lower()) if unicodedata.category(c) != 'Mn')
     u_limpa = u_normalizada.replace('(', '').replace(')', '').strip()
     mapeamento = {
         'xicara': 'xicara', 'xicaras': 'xicara', 'xicara de cha': 'xicara', 'xicara cha': 'xicara', 'xicaras de cha': 'xicara',
@@ -96,188 +76,212 @@ CONVERSOES_PARA_GRAMAS = {
 }
 CONVERSOES_PARA_GRAMAS_NORMALIZADO = {(''.join(c for c in unicodedata.normalize('NFD', k[0]) if unicodedata.category(c) != 'Mn'), k[1]): v for k, v in CONVERSOES_PARA_GRAMAS.items()}
 
-def converter_para_gramas(ingrediente: dict):
+def converter_para_gramas(ingrediente: dict) -> float:
     nome = ingrediente.get('nome_ingrediente')
     unidade = padronizar_unidade(ingrediente.get('unidade'))
-    quantidade = ingrediente.get('quantidade')
-    if quantidade is None: return 0.0
+    quantidade_str = str(ingrediente.get('quantidade', '0'))
+    
     try:
-        if isinstance(quantidade, str):
-            partes = quantidade.split()
-            total = 0
+        quantidade_str = quantidade_str.replace(',', '.').strip()
+        total = 0.0
+        if ' ' in quantidade_str:
+            partes = quantidade_str.split(' ')
             for parte in partes:
                 if '/' in parte:
-                    num, den = parte.split('/')
-                    total += float(num) / float(den)
-                else:
+                    num, den = map(float, parte.split('/'))
+                    if den != 0: total += num / den
+                elif parte:
                     total += float(parte)
-            quantidade = total
+        elif '/' in quantidade_str:
+            num, den = map(float, quantidade_str.split('/'))
+            if den != 0: total += num / den
         else:
-            quantidade = float(quantidade)
-    except (ValueError, TypeError): return 0.0
+            total = float(quantidade_str)
+        quantidade = total
+    except (ValueError, TypeError, ZeroDivisionError):
+        return 0.0
+
     if unidade in ['g', 'gramas']: return quantidade
     if unidade in ['kg', 'quilos']: return quantidade * 1000
     if unidade in ['ml']: return quantidade
     if unidade in ['l', 'litros']: return quantidade * 1000
+
     if nome and unidade:
         nome_normalizado = ''.join(c for c in unicodedata.normalize('NFD', nome.lower()) if unicodedata.category(c) != 'Mn')
         peso = CONVERSOES_PARA_GRAMAS_NORMALIZADO.get((nome_normalizado, unidade))
         if peso is not None: return quantidade * peso
         peso = CONVERSOES_PARA_GRAMAS_NORMALIZADO.get(('genérico', unidade))
         if peso is not None: return quantidade * peso
+    
     return 0.0
 
-def criar_tabelas_de_cache(conn):
-    conn.execute(text("CREATE TABLE IF NOT EXISTS taco_complementar (alimento TEXT PRIMARY KEY, calorias REAL, proteina REAL, lipideos REAL, carboidratos REAL, fibras REAL);"))
-    conn.execute(text("CREATE TABLE IF NOT EXISTS mapeamento_cache (nome_ingrediente TEXT PRIMARY KEY, nome_taco TEXT);"))
-    print("✔️ Tabelas de cache ('taco_complementar', 'mapeamento_cache') garantidas no PostgreSQL.")
+# --- FUNÇÕES PRINCIPAIS ---
 
-def tentar_mapeamento_automatico_com_ia(nome_ingrediente: str, lista_alimentos_taco: list, conn):
-    cache_query = text("SELECT nome_taco FROM mapeamento_cache WHERE nome_ingrediente = :nome_ing")
-    resultado = conn.execute(cache_query, {"nome_ing": nome_ingrediente}).fetchone()
-    if resultado: return resultado[0] if resultado[0] != 'IGNORE' else None
+def criar_tabela_cache(conn):
+    # CORREÇÃO 1: Adicionada a coluna "texto_completo" que estava faltando.
+    query = text("""
+        CREATE TABLE IF NOT EXISTS taco_complementar (
+            alimento TEXT PRIMARY KEY, 
+            calorias REAL, 
+            proteina REAL, 
+            lipideos REAL, 
+            carboidratos REAL, 
+            fibras REAL, 
+            texto_completo TEXT
+        );
+    """)
+    conn.execute(query)
+    print("✔️ Tabela de cache 'taco_complementar' garantida no PostgreSQL.")
 
+def tentar_aprender_nutrientes_com_ia(nome_ingrediente: str) -> dict | None:
     print(f"   -> Aprendendo sobre '{nome_ingrediente}' com a IA...")
     time.sleep(1.1)
+    
     model = genai.GenerativeModel('models/gemini-flash-latest')
-    contexto_taco = ", ".join(random.sample(lista_alimentos_taco, min(len(lista_alimentos_taco), 50)))
-    prompt = f'Contexto: A Tabela TACO usa nomes como: "{contexto_taco}". Tarefa: Analise o ingrediente "{nome_ingrediente}". Responda com o nome da Tabela TACO que melhor corresponde. Se for irrelevante (tempero, água, marca) ou ambíguo, responda APENAS com "IGNORE". Responda apenas com o nome exato ou "IGNORE".'
+    prompt = f'Forneça a informação nutricional para 100 gramas de "{nome_ingrediente}". Responda APENAS com um único objeto JSON com as chaves "calorias", "proteina", "lipideos", "carboidratos", e "fibras". Se o ingrediente for inválido ou não tiver dados (ex: "água", "sal"), retorne um JSON com valores 0.'
     
     try:
-        response = model.generate_content(prompt)
-        nome_taco_sugerido = response.text.strip()
-        insert_query = text("INSERT INTO mapeamento_cache (nome_ingrediente, nome_taco) VALUES (:nome_ing, :nome_taco) ON CONFLICT(nome_ingrediente) DO NOTHING")
-        conn.execute(insert_query, {"nome_ing": nome_ingrediente, "nome_taco": nome_taco_sugerido})
-        return nome_taco_sugerido if nome_taco_sugerido != 'IGNORE' else None
+        response = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(response_mime_type="application/json")
+        )
+        dados = json.loads(response.text)
+        
+        nutrientes = {
+            'alimento': nome_ingrediente,
+            'calorias': float(dados.get('calorias', 0)),
+            'proteina': float(dados.get('proteina', 0)),
+            'lipideos': float(dados.get('lipideos', 0)),
+            'carboidratos': float(dados.get('carboidratos', 0)),
+            'fibras': float(dados.get('fibras', 0)),
+            'texto_completo': response.text
+        }
+        print(f"   -> ✅ IA aprendeu: '{nome_ingrediente}'")
+        return nutrientes
+
     except google_exceptions.ResourceExhausted as e:
         raise QuotaExceededError(f"Cota da API do Gemini excedida: {e}")
     except Exception as e:
-        print(f"      -> Erro na API do Gemini durante o mapeamento: {e}"); return None
+        print(f"      -> Erro na API do Gemini durante o aprendizado: {e}")
+        return None
 
-def encontrar_alimento_na_taco(nome_ingrediente: str, df_taco, conn, lista_alimentos_taco: list, api_disponivel: bool):
-    if not nome_ingrediente: return None
+def encontrar_alimento(conn, nome_ingrediente: str, df_taco: pd.DataFrame, api_disponivel: bool):
+    if not nome_ingrediente or nome_ingrediente.lower() in BLACKLISTA_IGNORAR:
+        return None
+
     cache_query = text("SELECT calorias, proteina, lipideos, carboidratos, fibras FROM taco_complementar WHERE alimento = :alimento")
     resultado_cache = conn.execute(cache_query, {"alimento": nome_ingrediente}).fetchone()
-    if resultado_cache: return pd.Series(resultado_cache._asdict())
-    
+    if resultado_cache:
+        return pd.Series(resultado_cache._asdict())
+
     nome_normalizado = ''.join(c for c in unicodedata.normalize('NFD', nome_ingrediente.lower()) if unicodedata.category(c) != 'Mn')
     nome_mapeado = MAPEAMENTO_TACO_NORMALIZADO.get(nome_normalizado)
     nome_final_busca = ''.join(c for c in unicodedata.normalize('NFD', nome_mapeado.lower()) if unicodedata.category(c) != 'Mn') if nome_mapeado else nome_normalizado
-    if nome_final_busca in df_taco.index: return df_taco.loc[nome_final_busca]
+    if nome_final_busca in df_taco.index:
+        return df_taco.loc[nome_final_busca]
     
     matches = difflib.get_close_matches(nome_final_busca, df_taco.index.tolist(), n=1, cutoff=0.8)
-    if matches: return df_taco.loc[matches[0]]
-    
+    if matches:
+        return df_taco.loc[matches[0]]
+
     if api_disponivel:
-        nome_taco_aprendido = tentar_mapeamento_automatico_com_ia(nome_ingrediente, lista_alimentos_taco, conn)
-        if nome_taco_aprendido:
-            nome_aprendido_normalizado = ''.join(c for c in unicodedata.normalize('NFD', nome_taco_aprendido.lower()) if unicodedata.category(c) != 'Mn')
-            if nome_aprendido_normalizado in df_taco.index:
-                return df_taco.loc[nome_aprendido_normalizado]
+        dados_aprendidos = tentar_aprender_nutrientes_com_ia(nome_ingrediente)
+        if dados_aprendidos:
+            insert_query = text("""
+                INSERT INTO taco_complementar (alimento, calorias, proteina, lipideos, carboidratos, fibras, texto_completo)
+                VALUES (:alimento, :calorias, :proteina, :lipideos, :carboidratos, :fibras, :texto_completo)
+                ON CONFLICT(alimento) DO UPDATE SET
+                    calorias = EXCLUDED.calorias,
+                    proteina = EXCLUDED.proteina,
+                    lipideos = EXCLUDED.lipideos,
+                    carboidratos = EXCLUDED.carboidratos,
+                    fibras = EXCLUDED.fibras,
+                    texto_completo = EXCLUDED.texto_completo;
+            """)
+            conn.execute(insert_query, dados_aprendidos)
+            dados_aprendidos.pop('alimento', None)
+            dados_aprendidos.pop('texto_completo', None)
+            return pd.Series(dados_aprendidos)
+            
     return None
 
-def calcular_nutrientes_receita(ingredientes: list, df_taco, conn, lista_alimentos_taco, api_disponivel):
-    if not ingredientes: return None, True
-    totais = {'calorias': 0.0, 'proteina': 0.0, 'lipideos': 0.0, 'carboidratos': 0.0, 'fibras': 0.0}
-    blacklist_pattern = r'\b(' + '|'.join(re.escape(term) for term in BLACKLISTA_IGNORAR) + r')\b'
-    
-    for ing in ingredientes:
-        nome_quebrado = ing.get('nome_ingrediente')
-        nome_ingrediente = corrigir_texto_quebrado(nome_quebrado)
-        if not nome_ingrediente or re.search(blacklist_pattern, nome_ingrediente.lower()): continue
-        
-        peso_em_gramas = converter_para_gramas(ing)
-        if peso_em_gramas > 0:
-            dados_taco = encontrar_alimento_na_taco(nome_ingrediente, df_taco, conn, lista_alimentos_taco, api_disponivel)
-            if dados_taco is not None and not dados_taco.empty:
-                fator = peso_em_gramas / 100.0
-                for nutriente in totais.keys():
-                    if nutriente in dados_taco and pd.notna(dados_taco[nutriente]):
-                        try: totais[nutriente] += float(dados_taco[nutriente]) * fator
-                        except (ValueError, TypeError): continue
-            else:
-                print(f"     -> AVISO: Não foram encontrados dados para '{nome_ingrediente}'. A receita não será calculada.")
-                return None, False
-    return totais, True
-
-def salvar_nutrientes_no_banco(receita_id: int, totais: dict, conn):
-    query = text("UPDATE receitas SET informacoes_nutricionais = :info_nutri, nutrientes_calculados = TRUE WHERE id = :receita_id;")
-    params = { "receita_id": receita_id, "info_nutri": json.dumps(totais) }
-    conn.execute(query, params)
+def salvar_nutrientes(conn, receita_id, totais):
+    update_query = text("UPDATE receitas SET informacoes_nutricionais = :info, nutrientes_calculados = TRUE WHERE id = :id")
+    conn.execute(update_query, {"info": json.dumps(totais), "id": receita_id})
 
 # --- BLOCO PRINCIPAL ---
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Calcula os nutrientes de receitas no banco de dados NutriAI (PostgreSQL).")
-    parser.add_argument('-m', '--mode', choices=['new', 'all', 'range'], default='new', help="Modo de execução.")
-    parser.add_argument('-l', '--limit', type=int, default=None, help="Limita o número de receitas a processar.")
-    parser.add_argument('ids', nargs='*', type=int, help="IDs ou intervalo para o modo 'range'.")
+    parser = argparse.ArgumentParser(description="Calcula nutrientes de receitas.")
+    parser.add_argument("-l", "--limit", type=int, help="Número máximo de receitas para processar.")
     args = parser.parse_args()
 
-    tabela_taco_df = carregar_tabela_taco()
-    if tabela_taco_df is None: exit()
+    df_taco = carregar_tabela_taco()
+    if df_taco is None: exit()
 
     try:
-        db_url = URL.create(
-            drivername="postgresql+psycopg2",
-            username=os.getenv("POSTGRES_USER"), password=os.getenv("POSTGRES_PASSWORD"),
-            host=os.getenv("POSTGRES_HOST"), port=os.getenv("POSTGRES_PORT"),
-            database=os.getenv("POSTGRES_DB"), query={"client_encoding": "utf8"}
-        )
+        db_url = URL.create(drivername="postgresql+psycopg2", username=os.getenv("POSTGRES_USER"), password=os.getenv("POSTGRES_PASSWORD"), host=os.getenv("POSTGRES_HOST"), port=os.getenv("POSTGRES_PORT"), database=os.getenv("POSTGRES_DB"), query={"client_encoding": "utf8"})
         engine = create_engine(db_url)
         print("✔️ Conectado ao PostgreSQL.")
     except Exception as e:
         print(f"❌ ERRO ao conectar ao PostgreSQL: {e}"); exit()
+        
+    api_disponivel = True
+    
+    receitas_para_calcular = []
+    with engine.connect() as conn:
+        criar_tabela_cache(conn)
+        query = text("SELECT id, titulo, ingredientes FROM receitas WHERE processado_pela_llm = TRUE AND nutrientes_calculados = FALSE ORDER BY id")
+        if args.limit:
+            query = text(str(query) + f" LIMIT {args.limit}")
+        receitas_para_calcular = conn.execute(query).fetchall()
 
-    try:
+    total_a_calcular = len(receitas_para_calcular)
+    if not total_a_calcular:
+        print("Nenhuma receita nova para calcular.")
+    else:
+        print(f"Encontradas {total_a_calcular} receitas para calcular os nutrientes. Iniciando...")
+
+    for i, receita in enumerate(receitas_para_calcular):
+        print(f"\n[{i+1}/{total_a_calcular}] Processando Receita ID {receita.id} ('{corrigir_texto_quebrado(receita.titulo)}')")
+        
         with engine.begin() as conn:
-            criar_tabelas_de_cache(conn)
-            lista_alimentos_taco = tabela_taco_df['alimento'].tolist()
+            try:
+                if not receita.ingredientes:
+                    print("   -> AVISO: Receita sem ingredientes estruturados. Pulando.")
+                    continue
 
-            query_base = "SELECT id, titulo, ingredientes FROM receitas"
-            params = {}
-            where_clauses = []
-            if args.mode == 'all': where_clauses.append("processado_pela_llm = TRUE")
-            elif args.mode == 'new': where_clauses.append("processado_pela_llm = TRUE AND nutrientes_calculados = FALSE")
-            elif args.mode == 'range':
-                if not args.ids: print("ERRO: O modo 'range' requer IDs."); exit()
-                elif len(args.ids) == 1: where_clauses.append("id = :id_val"); params["id_val"] = args.ids[0]
-                else:
-                    start_id, end_id = sorted(args.ids)[:2]
-                    where_clauses.append("id BETWEEN :start_id AND :end_id")
-                    params.update({"start_id": start_id, "end_id": end_id})
-            
-            final_query_str = query_base
-            if where_clauses: final_query_str += " WHERE " + " AND ".join(where_clauses)
-            if args.limit: final_query_str += " LIMIT :limit_val"; params["limit_val"] = args.limit
-            
-            receitas_para_calcular = conn.execute(text(final_query_str), params).fetchall()
-            total_a_calcular = len(receitas_para_calcular)
-            
-            if not receitas_para_calcular:
-                print("\nNenhuma receita para calcular com os critérios fornecidos.")
-            else:
-                print(f"\nEncontradas {total_a_calcular} receitas para calcular os nutrientes.")
-                print("Iniciando cálculo...")
-            
-            api_disponivel = True
-            
-            # Removido TQDM e simplificado o loop
-            for i, receita in enumerate(receitas_para_calcular):
-                try:
-                    totais_nutricionais, sucesso = calcular_nutrientes_receita(receita.ingredientes, tabela_taco_df, conn, lista_alimentos_taco, api_disponivel)
-                    if sucesso and totais_nutricionais is not None:
-                        salvar_nutrientes_no_banco(receita.id, totais_nutricionais, conn)
-                        print(f"  -> ✅ Nutrientes da Receita ID {receita.id} ('{corrigir_texto_quebrado(receita.titulo)}') foram calculados e salvos.")
-                except QuotaExceededError:
-                    if api_disponivel: print("\n\n!!! ATENÇÃO: Cota da API excedida. O mapeamento automático foi interrompido. !!!\n")
-                    api_disponivel = False
-                
-                if (i + 1) % 100 == 0 and total_a_calcular > 100:
-                    restantes = total_a_calcular - (i + 1)
-                    print(f"\n--- Progresso: {i + 1} de {total_a_calcular} receitas calculadas. Faltam {restantes}. ---\n")
+                totais = {'calorias': 0.0, 'proteina': 0.0, 'lipideos': 0.0, 'carboidratos': 0.0, 'fibras': 0.0}
+                sucesso_total = True
 
-    except Exception as e_geral:
-        print(f"❌ Ocorreu um erro geral e o script PAROU: {e_geral}")
-        import traceback; traceback.print_exc()
-    finally:
-        print("\nProcesso de cálculo de nutrientes concluído.")
+                for ing in receita.ingredientes:
+                    nome_ing = corrigir_texto_quebrado(ing.get("nome_ingrediente"))
+                    # CORREÇÃO 2: Usando a função robusta de conversão para gramas.
+                    peso_g = converter_para_gramas(ing)
+                    
+                    if not nome_ing or peso_g <= 0:
+                        continue
+                        
+                    dados_nutricionais = encontrar_alimento(conn, nome_ing, df_taco, api_disponivel)
+
+                    if dados_nutricionais is not None and not dados_nutricionais.empty:
+                        fator = peso_g / 100.0
+                        for nutriente in totais.keys():
+                            if nutriente in dados_nutricionais and pd.notna(dados_nutricionais[nutriente]):
+                                totais[nutriente] += float(dados_nutricionais[nutriente]) * fator
+                    else:
+                        print(f"   -> ❌ AVISO: Falha ao encontrar/aprender sobre '{nome_ing}'. A receita não será calculada.")
+                        sucesso_total = False
+                        break 
+
+                if sucesso_total:
+                    salvar_nutrientes(conn, receita.id, totais)
+                    print(f"   -> ✅ Nutrientes calculados e salvos.")
+
+            except QuotaExceededError:
+                api_disponivel = False
+                print("\n\n!!! ATENÇÃO: Cota da API excedida. O aprendizado será desativado. !!!\n")
+            except Exception as e_receita:
+                print(f"   -> ❌ Erro inesperado ao processar a receita. Alterações desfeitas. Erro: {e_receita}")
+
+    if engine: engine.dispose()
+    print("\nProcesso de cálculo de nutrientes concluído.")

@@ -1,15 +1,15 @@
 # scripts/revisar_receitas_processadas.py
+# VERSÃO ATUALIZADA COM A LÓGICA DA COLUNA 'revisado'
 import json
 import os
 import time
-import argparse  # 1. Importa a biblioteca de argumentos
+import argparse
 import google.generativeai as genai
 from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
 
 # --- CONFIGURAÇÕES ---
-# (O resto das configurações permanece igual)
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
 
@@ -23,8 +23,7 @@ except (ValueError, TypeError) as e:
     print(f"ERRO DE CONFIGURAÇÃO: {e}")
     exit()
 
-# --- FUNÇÕES DE CORREÇÃO COM IA ---
-# (As funções 'corrigir_titulo_receita_com_gemini' e 'analisar_ingrediente_com_gemini' permanecem as mesmas)
+# --- FUNÇÕES DE CORREÇÃO COM IA (sem alterações) ---
 def corrigir_titulo_receita_com_gemini(titulo: str, retries=3, delay=2):
     """Usa a IA para corrigir e padronizar o título de uma receita."""
     model = genai.GenerativeModel('models/gemini-flash-latest')
@@ -70,27 +69,27 @@ def analisar_ingrediente_com_gemini(texto_ingrediente: str):
         print(f"   -> Erro na re-análise do ingrediente '{texto_ingrediente}': {e}")
         return None
 
-# --- FUNÇÕES DE BANCO DE DADOS ---
+# --- FUNÇÕES DE BANCO DE DADOS (ATUALIZADAS) ---
 
-def buscar_receitas_processadas(conn, limit=None): # 2. Aceita o parâmetro 'limit'
-    """Busca receitas já processadas, com um limite opcional."""
-    # ATENÇÃO: A query agora busca 'processado_pela_llm = TRUE'
-    base_query = "SELECT id, titulo, ingredientes FROM receitas WHERE processado_pela_llm = TRUE"
-    params = {}
-    
+def buscar_receitas_para_revisar(conn, limit=None):
+    """Busca receitas que foram processadas mas ainda não revisadas."""
+    # ALTERAÇÃO 1: A query agora busca por 'revisado = FALSE'
+    query_str = "SELECT id, titulo, ingredientes FROM receitas WHERE processado_pela_llm = TRUE AND revisado = FALSE ORDER BY id;"
     if limit:
-        base_query += " LIMIT :limit" # 3. Adiciona LIMIT à query se fornecido
-        params['limit'] = limit
+        query_str = query_str.replace(";", f" LIMIT {limit};")
         
-    query = text(base_query)
-    result = conn.execute(query, params).fetchall()
+    query = text(query_str)
+    result = conn.execute(query).fetchall()
     return result
 
 def atualizar_receita_revisada(conn, receita_id, titulo_novo, ingredientes_novos):
+    """Atualiza a receita e marca como revisada."""
+    # ALTERAÇÃO 2: A query agora define 'revisado = TRUE'
     update_query = text("""
         UPDATE receitas SET
             titulo = :titulo,
-            ingredientes = :ingredientes
+            ingredientes = :ingredientes,
+            revisado = TRUE
         WHERE id = :id;
     """)
     params = {
@@ -102,7 +101,6 @@ def atualizar_receita_revisada(conn, receita_id, titulo_novo, ingredientes_novos
 
 # --- FLUXO PRINCIPAL DE REVISÃO ---
 if __name__ == "__main__":
-    # 4. Configuração para ler argumentos da linha de comando
     parser = argparse.ArgumentParser(description="Revisa receitas já processadas no banco de dados.")
     parser.add_argument("--limit", type=int, help="Número máximo de receitas para revisar.")
     args = parser.parse_args()
@@ -122,21 +120,22 @@ if __name__ == "__main__":
 
     print("\nIniciando revisão de receitas já processadas...")
     with engine.connect() as conn:
-        # 5. Passa o argumento 'limit' para a função de busca
-        receitas_para_revisar = buscar_receitas_processadas(conn, limit=args.limit)
+        # ALTERAÇÃO 3: Chamando a função com o novo nome
+        receitas_para_revisar = buscar_receitas_para_revisar(conn, limit=args.limit)
 
     total_receitas = len(receitas_para_revisar)
-    print(f"Encontradas {total_receitas} receitas para revisar.")
+    
+    if not total_receitas:
+        print("✅ Nenhuma receita para revisar. Todas já estão atualizadas!")
+    else:
+        print(f"Encontradas {total_receitas} receitas para revisar.")
 
     for i, row in enumerate(receitas_para_revisar):
-        # A coluna 3 agora é um objeto Python (lista/dict), não uma string JSON
         receita_id, titulo_bruto, ingredientes_antigos = row
-
         print(f"\nRevisando Receita ID {receita_id} ({i+1}/{total_receitas})...")
         
-        with engine.begin() as conn: # Transação por receita
+        with engine.begin() as conn:
             try:
-                # Corrigir Título
                 try:
                     titulo_corrigido_encoding = titulo_bruto.encode('latin1').decode('utf-8')
                 except:
@@ -146,15 +145,12 @@ if __name__ == "__main__":
                 print(f"   -> Título: '{titulo_bruto}' -> '{titulo_final}'")
                 time.sleep(1.1)
 
-                # Corrigir Ingredientes
                 ingredientes_novos = []
-                # 6. A CONVERSÃO JSON.LOADS() FOI REMOVIDA DAQUI
                 ingredientes_antigos_lista = ingredientes_antigos if ingredientes_antigos else []
 
                 for ingrediente_antigo in ingredientes_antigos_lista:
                     texto_original = ingrediente_antigo.get("texto_original")
-                    if not texto_original:
-                        continue
+                    if not texto_original: continue
 
                     ingrediente_corrigido = analisar_ingrediente_com_gemini(texto_original)
                     if ingrediente_corrigido:
@@ -164,9 +160,9 @@ if __name__ == "__main__":
                         ingredientes_novos.append(ingrediente_antigo)
                     time.sleep(1.1)
 
-                # Atualizar no Banco
                 atualizar_receita_revisada(conn, receita_id, titulo_final, ingredientes_novos)
-                print(f"   -> ✅ Receita ID {receita_id} foi revisada e atualizada com sucesso.")
+                # ALTERAÇÃO 4: Mensagem de sucesso atualizada
+                print(f"   -> ✅ Receita ID {receita_id} foi revisada e marcada como 'revisado'.")
 
             except Exception as e:
                 print(f"❌ Erro ao revisar a receita ID {receita_id}. Alterações desfeitas. Erro: {e}")
