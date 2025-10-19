@@ -5,3 +5,4 @@ psycopg2-binary
 python-dotenv
 sqlalchemy
 google-generativeai
+fpdf2

@@ -1,36 +1,39 @@
+# api/schemas.py
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, Any
 
-# Schema para exibir um ingrediente (não precisa de todos os campos do banco)
+# Schema simplificado para exibir a descrição de um ingrediente
+# A estrutura vem do JSON, não de uma tabela separada
 class IngredienteSchema(BaseModel):
-    id: int
     descricao: str
 
-    class Config:
-        from_attributes = True
-
-# Schema para exibir uma receita completa, incluindo seus ingredientes
+# Schema para exibir uma receita completa
 class ReceitaSchema(BaseModel):
     id: int
     titulo: str
-    url: str
-    modo_preparo: str
+    modo_preparo: Optional[str] = ""
     ingredientes: List[IngredienteSchema] = []
 
     class Config:
         from_attributes = True
 
-# Schema para os dados que o usuário vai ENVIAR para a API
+# Schema para os dados que o usuário envia para a API
 class UserRequestSchema(BaseModel):
     peso_kg: float
     altura_cm: float
     idade: int
-    sexo: str  # 'homem' ou 'mulher'
-    nivel_atividade: str # 'sedentario', 'leve', 'moderado', 'ativo'
-    objetivo: str # 'perder_peso', 'manter_peso', 'ganhar_massa'
-    restricoes: List[str] = []  # Adicionamos o campo de restrições como uma lista de strings
+    sexo: str
+    nivel_atividade: str
+    objetivo: str
+    restricoes: List[str] = []
+    tipo_plano: str
+    # --- [INÍCIO DA ATUALIZAÇÃO] ---
+    # Novos campos de saúde, ambos opcionais
+    doencas_cronicas: Optional[List[str]] = []
+    circunferencia_cintura: Optional[float] = None
+    # --- [FIM DA ATUALIZAÇÃO] ---
 
-# Schema para a resposta que a API vai DEVOLVER
+# Schema para a resposta que a API devolve
 class DietPlanResponseSchema(BaseModel):
     plano_texto: str
     meta_calorica_calculada: float

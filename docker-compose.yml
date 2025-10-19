@@ -1,11 +1,18 @@
 services:
   api:
-    build: ./nutriai/api
+    # ALTERAÇÃO 1: O 'build context' agora é a pasta raiz do projeto.
+    # Isso permite que o Python enxergue a pasta 'nutriai' como um pacote.
+    build:
+      context: .
+      dockerfile: nutriai/api/Dockerfile # Especificamos o Dockerfile da API
     container_name: nutriai_api
+    # ALTERAÇÃO 2: O comando agora usa o caminho completo do módulo.
+    command: uvicorn nutriai.api.main:app --host 0.0.0.0 --port 8000 --reload
     ports:
       - "8000:8000"
+    # ALTERAÇÃO 3: Mapeamos a pasta 'nutriai' inteira para dentro do contêiner.
     volumes:
-      - ./nutriai/api:/app
+      - ./nutriai:/app/nutriai
     environment:
       - POSTGRES_HOST=postgres
     env_file:
@@ -23,7 +30,8 @@ services:
     volumes:
       - ./frontend:/app
     environment:
-      - POSTGRES_HOST=postgres
+      # ALTERAÇÃO 4: Adicionamos a URL da API para que o frontend a encontre.
+      - API_URL=http://api:8000/planejar-dieta/
     env_file:
       - .env
     depends_on:
@@ -73,7 +81,7 @@ services:
       context: .
       dockerfile: Dockerfile.scripts
     container_name: nutriai_runner
-    command: tail -f /dev/null      # <-- CORREÇÃO APLICADA AQUI
+    command: tail -f /dev/null
     env_file:
       - .env
     depends_on:

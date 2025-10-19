@@ -35,7 +35,7 @@ def corrigir_texto_quebrado(texto: str):
     except (UnicodeEncodeError, UnicodeDecodeError): return texto
 
 BLACKLISTA_IGNORAR = {'água', 'agua', 'sal', 'gelo', 'a gosto', 'quanto baste', 'q.b.'}
-MAPEAMENTO_TACO = {"ovo": "Ovo, de galinha, inteiro, cru", "ovos": "Ovo, de galinha, inteiro, cru"} # Reduzido para exemplo
+MAPEAMENTO_TACO = {"ovo": "Ovo, de galinha, inteiro, cru", "ovos": "Ovo, de galinha, inteiro, cru"}
 MAPEAMENTO_TACO_NORMALIZADO = {''.join(c for c in unicodedata.normalize('NFD', k) if unicodedata.category(c) != 'Mn'): v for k, v in MAPEAMENTO_TACO.items()}
 
 def carregar_tabela_taco(caminho_csv: str = "data/processed/tabela_taco_processada.csv"):
@@ -118,16 +118,10 @@ def converter_para_gramas(ingrediente: dict) -> float:
 # --- FUNÇÕES PRINCIPAIS ---
 
 def criar_tabela_cache(conn):
-    # CORREÇÃO 1: Adicionada a coluna "texto_completo" que estava faltando.
     query = text("""
         CREATE TABLE IF NOT EXISTS taco_complementar (
-            alimento TEXT PRIMARY KEY, 
-            calorias REAL, 
-            proteina REAL, 
-            lipideos REAL, 
-            carboidratos REAL, 
-            fibras REAL, 
-            texto_completo TEXT
+            alimento TEXT PRIMARY KEY, calorias REAL, proteina REAL, 
+            lipideos REAL, carboidratos REAL, fibras REAL, texto_completo TEXT
         );
     """)
     conn.execute(query)
@@ -136,17 +130,14 @@ def criar_tabela_cache(conn):
 def tentar_aprender_nutrientes_com_ia(nome_ingrediente: str) -> dict | None:
     print(f"   -> Aprendendo sobre '{nome_ingrediente}' com a IA...")
     time.sleep(1.1)
-    
     model = genai.GenerativeModel('models/gemini-flash-latest')
     prompt = f'Forneça a informação nutricional para 100 gramas de "{nome_ingrediente}". Responda APENAS com um único objeto JSON com as chaves "calorias", "proteina", "lipideos", "carboidratos", e "fibras". Se o ingrediente for inválido ou não tiver dados (ex: "água", "sal"), retorne um JSON com valores 0.'
-    
     try:
         response = model.generate_content(
             prompt,
             generation_config=genai.types.GenerationConfig(response_mime_type="application/json")
         )
         dados = json.loads(response.text)
-        
         nutrientes = {
             'alimento': nome_ingrediente,
             'calorias': float(dados.get('calorias', 0)),
@@ -158,7 +149,6 @@ def tentar_aprender_nutrientes_com_ia(nome_ingrediente: str) -> dict | None:
         }
         print(f"   -> ✅ IA aprendeu: '{nome_ingrediente}'")
         return nutrientes
-
     except google_exceptions.ResourceExhausted as e:
         raise QuotaExceededError(f"Cota da API do Gemini excedida: {e}")
     except Exception as e:
@@ -166,7 +156,7 @@ def tentar_aprender_nutrientes_com_ia(nome_ingrediente: str) -> dict | None:
         return None
 
 def encontrar_alimento(conn, nome_ingrediente: str, df_taco: pd.DataFrame, api_disponivel: bool):
-    if not nome_ingrediente or nome_ingrediente.lower() in BLACKLISTA_IGNORAR:
+    if not nome_ingrediente:
         return None
 
     cache_query = text("SELECT calorias, proteina, lipideos, carboidratos, fibras FROM taco_complementar WHERE alimento = :alimento")
@@ -191,12 +181,8 @@ def encontrar_alimento(conn, nome_ingrediente: str, df_taco: pd.DataFrame, api_d
                 INSERT INTO taco_complementar (alimento, calorias, proteina, lipideos, carboidratos, fibras, texto_completo)
                 VALUES (:alimento, :calorias, :proteina, :lipideos, :carboidratos, :fibras, :texto_completo)
                 ON CONFLICT(alimento) DO UPDATE SET
-                    calorias = EXCLUDED.calorias,
-                    proteina = EXCLUDED.proteina,
-                    lipideos = EXCLUDED.lipideos,
-                    carboidratos = EXCLUDED.carboidratos,
-                    fibras = EXCLUDED.fibras,
-                    texto_completo = EXCLUDED.texto_completo;
+                    calorias = EXCLUDED.calorias, proteina = EXCLUDED.proteina, lipideos = EXCLUDED.lipideos,
+                    carboidratos = EXCLUDED.carboidratos, fibras = EXCLUDED.fibras, texto_completo = EXCLUDED.texto_completo;
             """)
             conn.execute(insert_query, dados_aprendidos)
             dados_aprendidos.pop('alimento', None)
@@ -211,8 +197,12 @@ def salvar_nutrientes(conn, receita_id, totais):
 
 # --- BLOCO PRINCIPAL ---
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Calcula nutrientes de receitas.")
-    parser.add_argument("-l", "--limit", type=int, help="Número máximo de receitas para processar.")
+    # --- ARGUMENTOS RESTAURADOS ---
+    # Esta seção foi restaurada para que o script entenda --mode, --limit, etc.
+    parser = argparse.ArgumentParser(description="Calcula os nutrientes de receitas no banco de dados NutriAI (PostgreSQL).")
+    parser.add_argument('-m', '--mode', choices=['new', 'all', 'range'], default='new', help="Modo de execução: 'new' (padrão) para não calculadas, 'all' para todas, 'range' para IDs específicos.")
+    parser.add_argument('-l', '--limit', type=int, help="Limita o número de receitas a processar.")
+    parser.add_argument('ids', nargs='*', type=int, help="IDs ou intervalo de IDs para o modo 'range'. Ex: 10 20")
     args = parser.parse_args()
 
     df_taco = carregar_tabela_taco()
@@ -230,14 +220,36 @@ if __name__ == "__main__":
     receitas_para_calcular = []
     with engine.connect() as conn:
         criar_tabela_cache(conn)
-        query = text("SELECT id, titulo, ingredientes FROM receitas WHERE processado_pela_llm = TRUE AND nutrientes_calculados = FALSE ORDER BY id")
+
+        # --- LÓGICA DE QUERY RESTAURADA ---
+        query_base = "SELECT id, titulo, ingredientes FROM receitas"
+        params = {}
+        where_clauses = ["processado_pela_llm = TRUE"]
+
+        if args.mode == 'new':
+            where_clauses.append("nutrientes_calculados = FALSE")
+        elif args.mode == 'range':
+            if not args.ids:
+                print("ERRO: O modo 'range' requer um ou dois IDs."); exit()
+            elif len(args.ids) == 1:
+                where_clauses.append("id = :id_val")
+                params["id_val"] = args.ids[0]
+            else:
+                start_id, end_id = sorted(args.ids)[:2]
+                where_clauses.append("id BETWEEN :start_id AND :end_id")
+                params.update({"start_id": start_id, "end_id": end_id})
+        # O modo 'all' não precisa de cláusula extra além de 'processado_pela_llm'
+        
+        final_query_str = f"{query_base} WHERE {' AND '.join(where_clauses)} ORDER BY id"
         if args.limit:
-            query = text(str(query) + f" LIMIT {args.limit}")
-        receitas_para_calcular = conn.execute(query).fetchall()
+            final_query_str += " LIMIT :limit_val"
+            params["limit_val"] = args.limit
+        
+        receitas_para_calcular = conn.execute(text(final_query_str), params).fetchall()
 
     total_a_calcular = len(receitas_para_calcular)
     if not total_a_calcular:
-        print("Nenhuma receita nova para calcular.")
+        print("Nenhuma receita para calcular com os critérios fornecidos.")
     else:
         print(f"Encontradas {total_a_calcular} receitas para calcular os nutrientes. Iniciando...")
 
@@ -255,10 +267,12 @@ if __name__ == "__main__":
 
                 for ing in receita.ingredientes:
                     nome_ing = corrigir_texto_quebrado(ing.get("nome_ingrediente"))
-                    # CORREÇÃO 2: Usando a função robusta de conversão para gramas.
                     peso_g = converter_para_gramas(ing)
                     
                     if not nome_ing or peso_g <= 0:
+                        continue
+                        
+                    if nome_ing.lower() in BLACKLISTA_IGNORAR:
                         continue
                         
                     dados_nutricionais = encontrar_alimento(conn, nome_ing, df_taco, api_disponivel)
