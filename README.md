@@ -129,24 +129,22 @@ O projeto é 100% conteinerizado. Siga os passos abaixo para executar a platafor
     * [Git](https://git-scm.com/) para clonar o repositório.
 
 2.  **Clonagem do Repositório:**
-```bash
+    ```bash
     git clone [https://github.com/Kamuratt/NutriIA.git](https://github.com/Kamuratt/NutriIA.git)
-cd NutriI
-```
+    cd NutriI
+    ```
 
 3.  **Configuração do Ambiente:**
     * Crie uma cópia do arquivo de exemplo `.env.example` e renomeie para `.env`.
     * Edite o arquivo `.env` e preencha as variáveis de ambiente, especialmente sua chave de API para a LLM (`GOOGLE_API_KEY`).
 
 4.  **Execução da Plataforma:**
-```bash
-# Este comando irá construir as imagens Docker (na primeira vez) e iniciar todos os contêineres de forma integrada. Aguarde até que todos os serviços estejam rodando (especialmente o banco de dados).
+    ```bash
+    # Este comando irá construir as imagens Docker (na primeira vez) e iniciar todos os contêineres de forma integrada. Aguarde até que todos os serviços estejam rodando         (        especialmente o banco de dados).
 
-docker-compose up --build
-```
-
-
-
+    docker-compose up --build
+    ```
+    
 5.  **Acesso aos Serviços:**
     * **Aplicação Web (Frontend):** `http://localhost:8501`
     * **Documentação da API (Swagger):** `http://localhost:8085/docs`
