@@ -1,4 +1,3 @@
-# nutriai/migrar_ingredientes_brutos.py
 import sqlite3
 import os
 import json
@@ -7,7 +6,6 @@ from sqlalchemy.engine import URL
 from dotenv import load_dotenv
 from tqdm import tqdm
 
-# --- Configuração ---
 # O script está em 'nutriai/', o DB está na pasta 'data/' na raiz do projeto.
 script_dir = os.path.dirname(os.path.abspath(__file__))
 project_root = os.path.dirname(script_dir)
@@ -20,7 +18,6 @@ def migrar_brutos():
     pg_engine = None
     sqlite_conn = None
     try:
-        # --- Conexão com PostgreSQL ---
         db_url = URL.create(
             drivername="postgresql+psycopg2",
             username=os.getenv("POSTGRES_USER"),
@@ -31,15 +28,13 @@ def migrar_brutos():
             query={"client_encoding": "utf8"}
         )
         pg_engine = create_engine(db_url)
-        print("✔️ Conectado ao PostgreSQL.")
+        print("Conectado ao PostgreSQL.")
 
-        # --- Conexão com SQLite ---
         sqlite_conn = sqlite3.connect(SQLITE_DB_PATH)
         sqlite_conn.row_factory = sqlite3.Row
         sqlite_cursor = sqlite_conn.cursor()
-        print(f"✔️ Conectado ao SQLite em: {SQLITE_DB_PATH}")
+        print(f"Conectado ao SQLite em: {SQLITE_DB_PATH}")
 
-        # 1. Ler todos os ingredientes brutos do SQLite e agrupar por receita
         print("[*] Lendo ingredientes brutos do banco de dados SQLite...")
         sqlite_cursor.execute("SELECT receita_id, descricao FROM ingredientes ORDER BY receita_id;")
         
@@ -54,14 +49,12 @@ def migrar_brutos():
             if descricao:
                 ingredientes_por_receita[receita_id].append(descricao)
         
-        print(f"🔍 Encontrados ingredientes brutos para {len(ingredientes_por_receita)} receitas no SQLite.")
+        print(f"Encontrados ingredientes brutos para {len(ingredientes_por_receita)} receitas no SQLite.")
 
-        # 2. Atualizar o PostgreSQL
         print("[*] Atualizando a coluna 'ingredientes_brutos' no PostgreSQL...")
         with pg_engine.begin() as conn:
             update_query = text("UPDATE receitas SET ingredientes_brutos = :brutos WHERE id = :id")
             
-            # <<< LINHA CORRIGIDA AQUI >>>
             for receita_id, lista_brutos in tqdm(ingredientes_por_receita.items(), desc="Migrando ingredientes brutos"):
                 if lista_brutos:
                     conn.execute(update_query, {
@@ -69,16 +62,16 @@ def migrar_brutos():
                         "brutos": json.dumps(lista_brutos)
                     })
         
-        print("\n🎉 Migração dos ingredientes brutos concluída com sucesso!")
+        print("\nMigração dos ingredientes brutos concluída com sucesso!")
 
     except Exception as e:
-        print(f"❌ Ocorreu um erro durante a migração dos dados brutos: {e}")
+        print(f"Ocorreu um erro durante a migração dos dados brutos: {e}")
     finally:
         if sqlite_conn:
             sqlite_conn.close()
         if pg_engine:
             pg_engine.dispose()
-        print("🔌 Conexões fechadas.")
+        print("Conexões fechadas.")
 
 if __name__ == "__main__":
     migrar_brutos()

@@ -17,3 +17,10 @@ COPY ./nutriai /app/nutriai
 # O comando para iniciar será dado pelo docker-compose.yml, então não precisamos de CMD aqui.
 # O expose continua sendo uma boa prática.
 EXPOSE 8000
+
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    libpango-1.0-0 \
+    libpangoft2-1.0-0 \
+    libpangocairo-1.0-0 \
+    && rm -rf /var/lib/apt/lists/*

@@ -1,4 +1,3 @@
-# scripts/auditoria_dados.py
 import pandas as pd
 import unicodedata
 import json
@@ -10,7 +9,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL, Engine
 from dotenv import load_dotenv
 
-# --- CONFIGURAÇÃO (sem alterações) ---
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
 class QuotaExceededError(Exception): pass
@@ -22,7 +20,6 @@ try:
 except ValueError as e:
     print(f"ERRO DE CONFIGURAÇÃO DA API: {e}"); exit()
 
-# --- FUNÇÕES AUXILIARES (sem alterações) ---
 def corrigir_texto_quebrado(texto: str):
     if not isinstance(texto, str): return texto
     try: return texto.encode('latin-1').decode('utf-8')
@@ -32,8 +29,6 @@ def normalizar_texto(texto: str):
     if not texto: return ""
     return ''.join(c for c in unicodedata.normalize('NFD', texto.lower()) if unicodedata.category(c) != 'Mn')
 
-# --- FUNÇÕES DE BANCO E IA (com a lógica de limpeza) ---
-
 def carregar_alimentos_conhecidos(engine: Engine) -> set:
     conhecidos = set()
     try:
@@ -42,15 +37,15 @@ def carregar_alimentos_conhecidos(engine: Engine) -> set:
         df_taco = pd.read_csv(caminho_taco)
         for alimento in df_taco['alimento']:
             conhecidos.add(normalizar_texto(alimento))
-        print(f"✔️ Carregados {len(conhecidos)} alimentos da Tabela TACO.")
+        print(f"Carregados {len(conhecidos)} alimentos da Tabela TACO.")
         with engine.connect() as conn:
             resultado = conn.execute(text("SELECT alimento FROM taco_complementar;")).fetchall()
             for row in resultado:
                 conhecidos.add(normalizar_texto(corrigir_texto_quebrado(row[0])))
-        print(f"✔️ Total de {len(conhecidos)} alimentos conhecidos (TACO + Cache).")
+        print(f"Total de {len(conhecidos)} alimentos conhecidos (TACO + Cache).")
         return conhecidos
     except Exception as e:
-        print(f"❌ AVISO: Não foi possível carregar todos os alimentos conhecidos: {e}")
+        print(f"AVISO: Não foi possível carregar todos os alimentos conhecidos: {e}")
         return conhecidos
 
 def criar_e_carregar_mapa_de_correcoes(conn) -> dict:
@@ -82,7 +77,7 @@ def corrigir_ingredientes_com_ia(lista_ingredientes: list) -> dict:
     try:
         response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(response_mime_type="application/json"))
         correcoes = json.loads(response.text)
-        print(f"   -> ✅ IA retornou {len(correcoes)} correções.")
+        print(f"   -> IA retornou {len(correcoes)} correções.")
         return correcoes
     except google_exceptions.ResourceExhausted as e:
         raise QuotaExceededError(f"Cota da API do Gemini excedida: {e}")
@@ -99,7 +94,7 @@ def salvar_correcoes_no_banco(conn, novas_correcoes: dict) -> int:
 
 def aplicar_correcoes_e_limpeza(engine: Engine, mapa_de_correcoes: dict) -> int:
     """
-    NOVA LÓGICA: Varre as receitas, corrige os nomes E REMOVE os ingredientes marcados como "IGNORE".
+    Varre as receitas, corrige os nomes E REMOVE os ingredientes marcados como "IGNORE".
     """
     print("\nIniciando aplicação de correções e limpeza nas receitas...")
     
@@ -117,12 +112,10 @@ def aplicar_correcoes_e_limpeza(engine: Engine, mapa_de_correcoes: dict) -> int:
         for ing in ingredientes_json:
             nome_original = corrigir_texto_quebrado(ing.get("nome_ingrediente"))
 
-            # Verifica se o ingrediente original deve ser ignorado
             if mapa_de_correcoes.get(nome_original) == "IGNORE":
                 modificado = True
                 continue # PULA este ingrediente, não o adiciona à lista final
 
-            # Se não for ignorado, verifica se precisa de correção de nome
             if nome_original in mapa_de_correcoes:
                 nome_corrigido = mapa_de_correcoes[nome_original]
                 if nome_corrigido != nome_original:
@@ -137,11 +130,10 @@ def aplicar_correcoes_e_limpeza(engine: Engine, mapa_de_correcoes: dict) -> int:
                 conn.execute(update_query, {"ingredientes_json": json.dumps(ingredientes_finais, ensure_ascii=False), "id": receita_id})
             receitas_modificadas += 1
             
-    print(f"✅ Limpeza e correções aplicadas! {receitas_modificadas} receitas foram atualizadas.")
+    print(f"Limpeza e correções aplicadas! {receitas_modificadas} receitas foram atualizadas.")
     return receitas_modificadas
 
 def gerar_relatorio_final(engine: Engine, stats: dict):
-    # (Função de relatório sem alterações)
     print("\n\n" + "="*80)
     print("= RELATÓRIO FINAL DE AUDITORIA E QUALIDADE DE DADOS".center(80))
     print("="*80)
@@ -176,14 +168,13 @@ def gerar_relatorio_final(engine: Engine, stats: dict):
         print("       para evitar a criação de novos ingredientes inválidos no futuro.")
     print("\n" + "="*80)
 
-# --- BLOCO PRINCIPAL (com a nova função de limpeza) ---
 if __name__ == "__main__":
     try:
         db_url = URL.create(drivername="postgresql+psycopg2", username=os.getenv("POSTGRES_USER"), password=os.getenv("POSTGRES_PASSWORD"), host=os.getenv("POSTGRES_HOST"), port=os.getenv("POSTGRES_PORT"), database=os.getenv("POSTGRES_DB"), query={"client_encoding": "utf8"})
         engine = create_engine(db_url)
-        print("✔️ Conectado ao PostgreSQL.")
+        print("Conectado ao PostgreSQL.")
     except Exception as e:
-        print(f"❌ ERRO ao conectar ao PostgreSQL: {e}"); exit()
+        print(f"ERRO ao conectar ao PostgreSQL: {e}"); exit()
 
     stats = {
         "total_ingredientes_unicos": 0,

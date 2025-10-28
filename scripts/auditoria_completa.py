@@ -1,4 +1,3 @@
-# scripts/auditoria_completa.py
 import os
 import json
 from dotenv import load_dotenv
@@ -6,7 +5,6 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
 import collections # Para contar os problemas
 
-# --- CONFIGURAÇÃO ---
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
 
@@ -19,7 +17,6 @@ FRASES_PROBLEMATICAS_PREPARO = [
     '%não pode ser convertido%'
 ]
 
-# --- FUNÇÃO AUXILIAR DE NORMALIZAÇÃO ---
 def normalizar_texto(texto: str) -> str:
     if not texto or not isinstance(texto, str): return ""
     try: return texto.encode('latin-1').decode('utf-8')
@@ -37,9 +34,9 @@ def auditar_dados_receitas():
             query={"client_encoding": "utf8"}
         )
         engine = create_engine(db_url)
-        print("✔️ Conectado ao PostgreSQL.")
+        print("Conectado ao PostgreSQL.")
     except Exception as e:
-        print(f"❌ ERRO ao conectar ao PostgreSQL: {e}"); return
+        print(f"ERRO ao conectar ao PostgreSQL: {e}"); return
 
     print("\nIniciando auditoria completa da tabela 'receitas'...")
 
@@ -62,16 +59,13 @@ def auditar_dados_receitas():
                 if (i + 1) % 500 == 0:
                     print(f"   ... {i+1} receitas auditadas.")
 
-                # --- Verificações ---
-                # (Verificações 1 a 5 sem alterações)
-                # 1. Título
                 if not row.titulo: problemas_encontrados['titulo_vazio'].append(row.id)
                 elif normalizar_texto(row.titulo) != row.titulo: problemas_encontrados['titulo_encoding'].append(row.id)
-                # 2. URL
+                
                 if not row.url: problemas_encontrados['url_vazio'].append(row.id)
-                # 3. Ingredientes Brutos
+                
                 if not row.ingredientes_brutos: problemas_encontrados['ingredientes_brutos_vazio'].append(row.id)
-                # 4. Modo de Preparo
+                
                 if not row.modo_preparo: problemas_encontrados['modo_preparo_vazio'].append(row.id)
                 elif normalizar_texto(row.modo_preparo) != row.modo_preparo: problemas_encontrados['modo_preparo_encoding'].append(row.id)
                 else:
@@ -79,12 +73,10 @@ def auditar_dados_receitas():
                         if frase.strip('%') in row.modo_preparo.lower():
                             problemas_encontrados['modo_preparo_frase_problematica'].append(row.id)
                             break
-                # 5. Consistência: processado_pela_llm vs ingredientes
+                
                 if row.processado_pela_llm and not row.ingredientes: problemas_encontrados['llm_true_sem_ingredientes'].append(row.id)
                 if not row.processado_pela_llm and row.ingredientes: problemas_encontrados['llm_false_com_ingredientes'].append(row.id)
 
-                # --- CORREÇÃO AQUI ---
-                # 6. Validade JSON e conteúdo de 'ingredientes'
                 ing_list = None
                 if row.ingredientes:
                     try:
@@ -113,14 +105,10 @@ def auditar_dados_receitas():
                                          break
                     except json.JSONDecodeError:
                         problemas_encontrados['ingredientes_json_invalido'].append(row.id)
-                # --- FIM DA CORREÇÃO 6 ---
 
-                # 7. Consistência: nutrientes_calculados vs informacoes_nutricionais (sem alterações)
                 if row.nutrientes_calculados and not row.informacoes_nutricionais: problemas_encontrados['calc_true_sem_info'].append(row.id)
                 if not row.nutrientes_calculados and row.informacoes_nutricionais: problemas_encontrados['calc_false_com_info'].append(row.id)
 
-                # --- CORREÇÃO AQUI ---
-                # 8. Validade JSON de 'informacoes_nutricionais'
                 info_dict = None
                 if row.informacoes_nutricionais:
                     try:
@@ -137,9 +125,7 @@ def auditar_dados_receitas():
                              problemas_encontrados['info_nutri_nao_dict'].append(row.id)
                     except json.JSONDecodeError:
                         problemas_encontrados['info_nutri_json_invalido'].append(row.id)
-                # --- FIM DA CORREÇÃO 8 ---
 
-                # 9. Verificação pós-revisão (sem alterações)
                 if row.revisado:
                     if normalizar_texto(row.titulo) != row.titulo: problemas_encontrados['revisado_com_titulo_encoding'].append(row.id)
                     if normalizar_texto(row.modo_preparo) != row.modo_preparo: problemas_encontrados['revisado_com_preparo_encoding'].append(row.id)
@@ -154,22 +140,21 @@ def auditar_dados_receitas():
                                  break
 
     except Exception as e:
-        print(f"\n❌ ERRO durante a auditoria: {e}")
+        print(f"\nERRO durante a auditoria: {e}")
         import traceback
         traceback.print_exc() # Imprime o stack trace completo para depuração
     finally:
         if engine: engine.dispose()
 
-    # --- Relatório Final (sem alterações) ---
     print("\n" + "="*80)
     print("= RELATÓRIO DA AUDITORIA COMPLETA DE DADOS".center(80))
     print("="*80)
     print(f"Total de Receitas Verificadas: {total_receitas}")
 
     if not problemas_encontrados:
-        print("\n✅ Nenhuma inconsistência grave encontrada!")
+        print("\nNenhuma inconsistência grave encontrada!")
     else:
-        print("\n⚠️ Inconsistências Encontradas:")
+        print("\nInconsistências Encontradas:")
         for tipo, ids in sorted(problemas_encontrados.items()): # Ordenado para melhor leitura
             count = len(ids)
             percent = (count / total_receitas) * 100 if total_receitas else 0

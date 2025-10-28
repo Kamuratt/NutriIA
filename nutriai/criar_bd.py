@@ -1,6 +1,5 @@
 import sqlite3
 
-# Define o nome do arquivo do nosso banco de dados.
 NOME_BANCO = "nutriai.db"
 
 def criar_tabelas():
@@ -8,14 +7,13 @@ def criar_tabelas():
     Cria o arquivo do banco de dados e as tabelas 'receitas' e 'ingredientes'
     se elas ainda não existirem.
     """
-    conn = None  # Inicia a conexão como nula
+    conn = None
     try:
         # sqlite3.connect() cria o arquivo .db se ele não existir
         conn = sqlite3.connect(NOME_BANCO)
         cursor = conn.cursor()
         print(f"Banco de dados '{NOME_BANCO}' conectado com sucesso.")
 
-        # --- Comando SQL para criar a tabela de receitas ---
         # A restrição UNIQUE na coluna 'url' é crucial para não inserirmos receitas duplicadas.
         cursor.execute("""
         CREATE TABLE IF NOT EXISTS receitas (
@@ -27,7 +25,6 @@ def criar_tabelas():
         """)
         print("Tabela 'receitas' verificada/criada.")
 
-        # --- Comando SQL para criar a tabela de ingredientes ---
         # A 'FOREIGN KEY' cria a ligação oficial entre as tabelas.
         # Garante que um ingrediente só pode pertencer a uma receita que realmente existe.
         cursor.execute("""
@@ -40,7 +37,6 @@ def criar_tabelas():
         """)
         print("Tabela 'ingredientes' verificada/criada.")
 
-        # Salva (commit) as alterações no arquivo do banco de dados
         conn.commit()
         print("Estrutura do banco de dados salva.")
 

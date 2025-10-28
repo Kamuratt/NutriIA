@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <title>Plano de Dieta NutriAI</title>
+    <style>
+        /* CSS para um PDF "Excelente" FINAL */
+        @page {
+            size: A4;
+            margin: 2cm; /* Margens da página */
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        h1, h2, h3 {
+             /* Tenta evitar que títulos fiquem sozinhos no fim da página */
+            page-break-after: avoid;
+        }
+
+        h1 {
+            color: #2E8B57; /* Verde NutriAI */
+            font-size: 28pt;
+            border-bottom: 3px solid #2E8B57;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        h2 {
+            color: #333;
+            font-size: 20pt;
+            border-bottom: 1px solid #ccc;
+            padding-bottom: 5px;
+            margin-top: 30px;
+        }
+
+        h3 {
+            color: #444;
+            font-size: 16pt;
+            font-style: italic;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+
+        /* Classe para forçar quebra de página */
+        .page-break {
+            page-break-after: always;
+        }
+
+        /* Bloco de Resumo do Perfil */
+        .perfil {
+            background-color: #f9f9f9;
+            border-left: 6px solid #2E8B57;
+            padding: 15px 20px;
+            margin-bottom: 30px;
+            font-size: 12pt;
+        }
+        .perfil strong {
+            color: #2E8B57;
+        }
+
+        /* Estilização do Plano da IA (convertido de Markdown) */
+        .plano-texto {
+            font-size: 11pt;
+        }
+        .plano-texto table { /* Estilos básicos para tabelas que podem vir do MD */
+            border-collapse: collapse; width: 100%; margin-bottom: 1em;
+        }
+        .plano-texto th, .plano-texto td {
+            border: 1px solid #ddd; padding: 8px; text-align: left;
+        }
+        .plano-texto th { background-color: #f2f2f2; }
+        .plano-texto ul { list-style-type: none; padding-left: 15px; }
+        .plano-texto li { margin-bottom: 12px; border-left: 3px solid #eee; padding-left: 10px; }
+        .plano-texto strong { color: #333; }
+        .plano-texto p { margin-bottom: 1em; }
+
+
+        /* Lista de Compras (Duas Colunas) */
+        .lista-compras ul {
+            column-count: 2;
+            column-gap: 40px;
+            list-style-type: "🍎 ";
+            font-size: 11pt;
+            padding-left: 30px;
+        }
+        .lista-compras li {
+            padding-left: 10px;
+            margin-bottom: 8px;
+            page-break-inside: avoid; /* Tenta evitar quebrar item da lista */
+        }
+
+        /* Bloco de Receita Individual */
+        .receita {
+            background-color: #fdfdfd;
+            border: 1px solid #eee;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+            margin-bottom: 25px;
+            page-break-inside: avoid; /* Tenta não quebrar uma receita no meio */
+            page-break-before: auto; /* Ajuda a evitar página em branco antes */
+        }
+        .receita h2 { /* Título da Receita */
+            margin-top: 0; font-size: 18pt; color: #2E8B57; border-bottom: none;
+        }
+        .receita h3 { /* Ingredientes / Modo de Preparo */
+            font-size: 14pt; font-style: normal; color: #333; border-bottom: 1px solid #eee; padding-bottom: 3px;
+        }
+        .receita-dia { /* "(Sugerida para...)" */
+            font-style: italic; color: #777; margin-top: -10px; margin-bottom: 15px;
+        }
+        .receita-macros {
+            font-size: 10pt; font-weight: bold; color: #555; background-color: #f0f0f0;
+            padding: 8px 12px; border-radius: 5px; display: inline-block; margin-bottom: 15px;
+        }
+        .receita p { font-size: 11pt; margin-bottom: 1em; }
+
+    </style>
+</head>
+<body>
+    <h1>Plano de Dieta Personalizado</h1>
+
+    <div class="perfil">
+        <h2>Resumo do Perfil</h2>
+        <p>
+            <strong>Objetivo:</strong> {{ user.objetivo|replace('_', ' ')|title }}<br>
+            <strong>Meta Calórica Diária:</strong> {{ meta_calorica|round(0)|int }} kcal<br>
+            <strong>Perfil:</strong> {{ user.sexo|title }}, {{ user.idade }} anos, {{ user.peso_kg }}kg, {{ user.altura_cm }}cm
+        </p>
+    </div>
+
+    <div class="plano-texto">
+        {{ plano_html|safe }}
+    </div>
+
+    <div class="page-break"></div>
+
+    <h1>Lista de Compras Sugerida</h1>
+    <div class="lista-compras">
+        <ul>
+            {% for item in lista_compras %}
+                <li>{{ item|replace('-', '')|trim }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="page-break"></div>
+
+    <h1>Detalhes das Receitas</h1>
+    <p>&nbsp;</p> {% for receita in receitas %}
+        <div class="receita">
+            <h2>{{ receita.titulo }}</h2>
+            {% if receita.dia_sugerido %}
+            <p class="receita-dia">(Sugerida para: {{ receita.dia_sugerido }})</p>
+            {% endif %}
+
+            <p class="receita-macros">
+                Kcal: {{ receita.calorias|round(0)|int }} |
+                Proteínas: {{ receita.proteinas|round(0)|int }}g |
+                Carboidratos: {{ receita.carboidratos|round(0)|int }}g |
+                Gorduras: {{ receita.gorduras|round(0)|int }}g
+            </p>
+
+            <h3>Ingredientes</h3>
+            <p>{{ receita.ingredientes|map(attribute='descricao')|join(', ') }}</p>
+
+            <h3>Modo de Preparo</h3>
+            <p>{{ receita.modo_preparo|replace('\n', '<br>')|safe }}</p>
+        </div>
+    {% endfor %}
+
+</body>
+</html>

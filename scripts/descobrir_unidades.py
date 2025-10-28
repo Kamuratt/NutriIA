@@ -1,12 +1,9 @@
-# scripts/diagnostico_unidades.py
 import pandas as pd
 import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
 from dotenv import load_dotenv
 
-# --- Configuração ---
-# Carrega o .env da pasta raiz do projeto
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
 
@@ -17,7 +14,6 @@ def raio_x_das_unidades_postgres():
     """
     engine = None
     try:
-        # Conexão com o PostgreSQL
         db_url = URL.create(
             drivername="postgresql+psycopg2",
             username=os.getenv("POSTGRES_USER"),
@@ -29,7 +25,6 @@ def raio_x_das_unidades_postgres():
         )
         engine = create_engine(db_url)
 
-        # Consulta de Debug para extrair unidades do JSONB
         # 1. jsonb_array_elements(ingredientes) -> Expande o array de ingredientes em linhas separadas
         # 2. elem->>'unidade' -> Extrai o valor da chave 'unidade' como texto de cada elemento
         query = text("""

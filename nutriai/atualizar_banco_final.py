@@ -1,4 +1,3 @@
-# atualizar_banco_final.py
 import sqlite3
 ARQUIVO_BANCO = "nutriai.db"
 conn = sqlite3.connect(ARQUIVO_BANCO)

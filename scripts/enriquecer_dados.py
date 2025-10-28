@@ -1,4 +1,3 @@
-# scripts/estruturacao_ingredientes.py
 import json
 import os
 import time
@@ -10,7 +9,6 @@ from dotenv import load_dotenv
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import URL
 
-# --- CONFIGURAÇÕES ---
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
 
@@ -27,8 +25,6 @@ try:
 except (ValueError, TypeError) as e:
     print(f"ERRO DE CONFIGURAÇÃO: {e}")
     exit()
-
-# --- FUNÇÕES DE PARSING E IA ---
 
 def parse_ingrediente_com_regras(texto: str):
     """Tenta extrair dados de um ingrediente usando regras (RegEx)."""
@@ -50,7 +46,6 @@ def analisar_ingrediente_com_gemini(texto_ingrediente: str):
     """Usa a IA para analisar e padronizar um ingrediente."""
     model = genai.GenerativeModel('models/gemini-flash-latest')
     
-    # --- PROMPT ATUALIZADO ---
     # Adicionada a regra crítica para retornar "IGNORE" caso não seja um ingrediente.
     prompt = f"""
     Analise o seguinte texto: '{texto_ingrediente}'.
@@ -76,7 +71,6 @@ def analisar_ingrediente_com_gemini(texto_ingrediente: str):
         
         texto_resposta = response.text.strip()
         
-        # --- LÓGICA ATUALIZADA ---
         # Verifica se a IA decidiu ignorar o texto
         if texto_resposta == "IGNORE":
             print(f"   -> IA ignorou texto que não é ingrediente: '{texto_ingrediente}'")
@@ -94,7 +88,6 @@ def analisar_ingrediente_com_gemini(texto_ingrediente: str):
     except google_exceptions.ResourceExhausted as e:
         raise QuotaExceededError(f"Cota da API do Gemini excedida: {e}")
     except Exception as e:
-        # Adicionado um tratamento para o caso de a resposta não ser nem "IGNORE" nem um JSON válido
         print(f"   -> Erro ao processar resposta da IA para '{texto_ingrediente}': {e}")
         print(f"   -> Resposta recebida: {response.text if 'response' in locals() else 'N/A'}")
         return None
@@ -114,8 +107,6 @@ def corrigir_titulo_receita_com_gemini(titulo: str, retries=3, delay=2):
             time.sleep(delay)
     print(f"   -> Aviso: Não foi possível corrigir o título '{titulo}'. Usando o original.")
     return titulo
-
-# --- FUNÇÕES DE BANCO DE DADOS ---
 
 def buscar_receitas_nao_processadas(conn, limit=None):
     """Busca receitas que ainda não foram processadas pela IA."""
@@ -142,7 +133,6 @@ def salvar_dados_e_marcar_como_processada(conn, receita_id, titulo_corrigido, li
     }
     conn.execute(update_query, params)
 
-# --- FLUXO PRINCIPAL ---
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Processa ingredientes de novas receitas usando IA.")
     parser.add_argument("--limit", type=int, help="Número máximo de receitas para processar.")
@@ -156,9 +146,9 @@ if __name__ == "__main__":
             query={"client_encoding": "utf8"}
         )
         engine = create_engine(db_url)
-        print("✔️ Conectado ao PostgreSQL.")
+        print("Conectado ao PostgreSQL.")
     except Exception as e:
-        print(f"❌ ERRO ao conectar ao PostgreSQL: {e}")
+        print(f"ERRO ao conectar ao PostgreSQL: {e}")
         exit()
 
     api_calls_count = 0
@@ -180,7 +170,6 @@ if __name__ == "__main__":
             
             with engine.begin() as conn_escrita:
                 try:
-                    # 1. Corrigir Título
                     try:
                         titulo_corrigido_encoding = titulo_bruto.encode('latin1').decode('utf-8')
                     except:
@@ -194,12 +183,10 @@ if __name__ == "__main__":
                         salvar_dados_e_marcar_como_processada(conn_escrita, receita_id, titulo_final, [])
                         continue
                     
-                    # 2. Processar Ingredientes
                     lista_ingredientes_estruturados = []
                     sucesso_total_receita = True
                     
                     for texto_ingrediente in ingredientes_brutos:
-                        # Pula linhas vazias
                         if not texto_ingrediente.strip():
                             continue
 
@@ -210,25 +197,22 @@ if __name__ == "__main__":
                             api_calls_count += 1
                             time.sleep(1.1)
 
-                        # --- LÓGICA DE TRATAMENTO ATUALIZADA ---
                         if dados_estruturados == "IGNORE":
                             continue # Simplesmente pula para o próximo ingrediente
                         
                         if dados_estruturados:
                             lista_ingredientes_estruturados.append(dados_estruturados)
                         else:
-                            # Se a IA falhou em entender, considera a receita como falha para revisão
                             print(f"\nFalha crítica ao processar ingrediente '{texto_ingrediente}' para a receita ID {receita_id}.")
                             sucesso_total_receita = False
                             break
                     
-                    # 3. Salvar no Banco
                     if sucesso_total_receita:
                         salvar_dados_e_marcar_como_processada(conn_escrita, receita_id, titulo_final, lista_ingredientes_estruturados)
-                        print(f"   -> ✅ Receita ID {receita_id} ('{titulo_final}') foi processada e salva.")
+                        print(f"   -> Receita ID {receita_id} ('{titulo_final}') foi processada e salva.")
                 
                 except Exception as e_receita:
-                    print(f"\n❌ Erro ao processar a receita ID {receita_id}. Alterações desfeitas. Erro: {e_receita}")
+                    print(f"\nErro ao processar a receita ID {receita_id}. Alterações desfeitas. Erro: {e_receita}")
 
             if (i + 1) % 50 == 0 and total_receitas > 50:
                 print(f"\n--- Progresso: {i + 1} de {total_receitas} receitas processadas. ---")

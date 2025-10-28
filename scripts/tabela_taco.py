@@ -10,7 +10,7 @@ colunas_de_interesse = [
     'Energia',
     'Proteína',
     'Lipídeos',
-    'Carboidrato', # Atenção aqui ao nome exato do arquivo
+    'Carboidrato',
     'Fibra Alimentar'
 ]
 

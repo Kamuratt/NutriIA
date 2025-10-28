@@ -1,4 +1,3 @@
-# scripts/revisar_receitas_processadas.py
 import json
 import os
 import time
@@ -12,7 +11,6 @@ from threading import Event, Lock
 from google.api_core import exceptions
 from pathlib import Path
 
-# --- CONFIGURAÇÕES ---
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
 
@@ -27,12 +25,10 @@ except (ValueError, TypeError) as e:
     print(f"ERRO DE CONFIGURAÇÃO: {e}")
     exit()
 
-# --- CONTROLE DE QUOTA ---
 quota_exceeded_event = Event()
 print_lock = Lock()
 quota_hit_message_printed = False
 
-# --- FUNÇÃO DE NORMALIZAÇÃO DE TEXTO ---
 def normalizar_texto(texto: str) -> str:
     if not texto or not isinstance(texto, str): return ""
     try: return texto.encode('latin-1').decode('utf-8')
@@ -40,12 +36,11 @@ def normalizar_texto(texto: str) -> str:
         try: return texto.encode('utf-8', 'ignore').decode('utf-8')
         except Exception: return texto
 
-# --- FUNÇÕES DE CORREÇÃO COM IA (CORRIGIDAS) ---
 def handle_quota_error(e):
     global quota_hit_message_printed
     with print_lock:
         if not quota_hit_message_printed:
-            print("\n" + "="*80); print("❌ QUOTA DA API ATINGIDA..."); print(f"   Detalhe: {e}"); print("="*80 + "\n"); quota_hit_message_printed = True
+            print("\n" + "="*80); print("QUOTA DA API ATINGIDA..."); print(f"   Detalhe: {e}"); print("="*80 + "\n"); quota_hit_message_printed = True
     quota_exceeded_event.set()
 
 def corrigir_titulo_receita_com_gemini(titulo: str):
@@ -94,14 +89,12 @@ def analisar_ingrediente_com_gemini(texto_ingrediente: str):
         print(f"  -> Aviso (Ingrediente): {e}")
         raise e
 
-# --- [MODIFICADO] FUNÇÃO PARA CLASSIFICAR RESTRIÇÕES ---
 def classificar_restricoes_com_gemini(titulo: str, ingredientes_json: list) -> dict:
     """
     Analisa a lista de ingredientes e classifica as restrições da receita.
     """
     if quota_exceeded_event.is_set(): return None
     
-    # Pega apenas o nome dos ingredientes para a análise
     nomes_ingredientes = [item.get('nome_ingrediente', item.get('texto_original', '')) for item in ingredientes_json]
     lista_ingredientes_str = ", ".join(filter(None, nomes_ingredientes))
     
@@ -137,7 +130,6 @@ def classificar_restricoes_com_gemini(titulo: str, ingredientes_json: list) -> d
         response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(response_mime_type="application/json"))
         classificacoes = json.loads(response.text)
         
-        # Garante que todas as chaves esperadas estão presentes
         for key in default_response:
             if key not in classificacoes or not isinstance(classificacoes[key], bool):
                 classificacoes[key] = default_response[key] # Usa o padrão se a chave estiver ausente ou mal formatada
@@ -151,7 +143,6 @@ def classificar_restricoes_com_gemini(titulo: str, ingredientes_json: list) -> d
         print(f"  -> Aviso (Classificação): {e}")
         raise e # Força a falha da receita
 
-# --- FUNÇÃO DE BUSCA NO BANCO ---
 def buscar_receitas_para_revisar(conn, limit=None, force=False):
     """Busca ID e URL das receitas para revisar."""
     query_str = "SELECT id, url FROM receitas WHERE processado_pela_llm = TRUE"
@@ -164,7 +155,6 @@ def buscar_receitas_para_revisar(conn, limit=None, force=False):
     query = text(query_str)
     return conn.execute(query).fetchall()
 
-# --- LÓGICA DE PROCESSAMENTO (MODIFICADA) ---
 def processar_uma_receita(row):
     """
     Pega id/url do banco, lê o JSON original, processa com IA e retorna dados corrigidos.
@@ -176,10 +166,9 @@ def processar_uma_receita(row):
 
     try:
         if not url:
-             print(f"   -> ⚠️ Receita ID {receita_id} sem URL no banco. Pulando.")
+             print(f"   -> Receita ID {receita_id} sem URL no banco. Pulando.")
              return None
 
-        # --- LÓGICA DE ENCONTRAR O ARQUIVO (sem alterações) ---
         slug = url.split('/')[-1].replace('.html', '')
         if '-' in slug and slug.split('-', 1)[0].isdigit():
             filename_base = slug.split('-', 1)[1]
@@ -195,12 +184,11 @@ def processar_uma_receita(row):
         if filepath_underscore.is_file():      filepath = filepath_underscore
         elif filepath_hyphen.is_file():        filepath = filepath_hyphen
         else:
-            print(f"   -> ⚠️ Arquivo JSON não encontrado para ID {receita_id}. Tentativas:")
+            print(f"   -> Arquivo JSON não encontrado para ID {receita_id}. Tentativas:")
             print(f"      - {filepath_underscore}")
             print(f"      - {filepath_hyphen}")
             return None
 
-        # --- LEITURA DO ARQUIVO ORIGINAL ---
         with open(filepath, 'r', encoding='utf-8') as f:
             dados_originais = json.load(f)
 
@@ -209,7 +197,6 @@ def processar_uma_receita(row):
         modo_preparo_original_lista = dados_originais.get('modo_preparo', [])
         modo_preparo_original_str = "\n".join(modo_preparo_original_lista)
 
-        # --- PROCESSAMENTO COM IA (agora dentro do try...except) ---
         titulo_final = corrigir_titulo_receita_com_gemini(normalizar_texto(titulo_original))
         time.sleep(0.5)
 
@@ -233,10 +220,9 @@ def processar_uma_receita(row):
             time.sleep(0.5)
         
         if quota_exceeded_event.is_set():
-            print(f"   -> ⚠️ Processamento da Receita ID {receita_id} interrompido devido à cota.")
+            print(f"   -> Processamento da Receita ID {receita_id} interrompido devido à cota.")
             return None
         
-        # --- CHAMADA À FUNÇÃO DE CLASSIFICAÇÃO ---
         print(f"   -> Classificando restrições da Receita ID {receita_id}...")
         classificacoes = classificar_restricoes_com_gemini(titulo_final, ingredientes_novos)
         time.sleep(0.5) # Respeita a cota
@@ -244,10 +230,9 @@ def processar_uma_receita(row):
         if not classificacoes: # Se a classificação falhar (por cota ou outro erro)
             if not quota_exceeded_event.is_set():
                 raise ValueError(f"Falha ao classificar restrições da Receita ID {receita_id}")
-            print(f"   -> ⚠️ Classificação da Receita ID {receita_id} interrompida.")
+            print(f"   -> Classificação da Receita ID {receita_id} interrompida.")
             return None
         
-        # --- [MODIFICADO] Retorna o resultado completo ---
         return {
             "id": receita_id, 
             "titulo": titulo_final, 
@@ -258,10 +243,9 @@ def processar_uma_receita(row):
 
     except Exception as e:
         if not quota_exceeded_event.is_set():
-            print(f"❌ Erro ao processar a receita ID {receita_id}: {e}")
+            print(f"Erro ao processar a receita ID {receita_id}: {e}")
         return None
 
-# --- [MODIFICADO] FUNÇÃO DE ATUALIZAÇÃO NO BANCO ---
 def atualizar_receita_revisada(conn, receita_id, titulo_novo, ingredientes_novos, modo_preparo_novo, classificacoes_novas):
     update_query = text("""
         UPDATE receitas SET
@@ -281,19 +265,16 @@ def atualizar_receita_revisada(conn, receita_id, titulo_novo, ingredientes_novos
     """)
     ingredientes_json = json.dumps(ingredientes_novos if ingredientes_novos is not None else [], ensure_ascii=False)
     
-    # Combina os parâmetros
     params = {
         "id": receita_id, 
         "titulo": titulo_novo, 
         "ingredientes": ingredientes_json, 
         "modo_preparo": modo_preparo_novo
     }
-    # Adiciona as novas classificações ao dicionário de parâmetros
     params.update(classificacoes_novas)
     
     conn.execute(update_query, params)
 
-# --- FLUXO PRINCIPAL ---
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Revisa receitas lendo JSONs originais, de forma paralela.")
     parser.add_argument("--limit", type=int, help="Número máximo de receitas para revisar.")
@@ -302,22 +283,22 @@ if __name__ == "__main__":
     args = parser.parse_args()
     
     if not ORIGINAL_JSON_FOLDER.is_dir():
-        print(f"❌ ERRO: A pasta de receitas processadas '{ORIGINAL_JSON_FOLDER}' não foi encontrada.")
+        print(f"ERRO: A pasta de receitas processadas '{ORIGINAL_JSON_FOLDER}' não foi encontrada.")
         exit()
 
     try:
         db_url = URL.create(drivername="postgresql+psycopg2", username=os.getenv("POSTGRES_USER"),password=os.getenv("POSTGRES_PASSWORD"), host=os.getenv("POSTGRES_HOST"),port=os.getenv("POSTGRES_PORT"), database=os.getenv("POSTGRES_DB"))
         engine = create_engine(db_url)
-        print("✔️ Conectado ao PostgreSQL.")
+        print("Conectado ao PostgreSQL.")
     except Exception as e:
-        print(f"❌ ERRO ao conectar ao PostgreSQL: {e}"); exit()
+        print(f"ERRO ao conectar ao PostgreSQL: {e}"); exit()
 
     print("\nBuscando IDs e URLs das receitas no banco de dados...")
     with engine.connect() as conn:
         receitas_para_revisar = buscar_receitas_para_revisar(conn, limit=args.limit, force=args.force)
     
     total_receitas = len(receitas_para_revisar)
-    if not total_receitas: print("✅ Nenhuma receita para revisar."); exit()
+    if not total_receitas: print("Nenhuma receita para revisar."); exit()
 
     print(f"Iniciando revisão de {total_receitas} receitas com {args.workers} workers paralelos (lendo arquivos originais)...")
     receitas_atualizadas = 0
@@ -331,29 +312,27 @@ if __name__ == "__main__":
             if resultado:
                 try:
                     with engine.begin() as conn:
-                        # --- [MODIFICADO] ---
                         atualizar_receita_revisada(
                             conn, 
                             resultado["id"], 
                             resultado["titulo"],
                             resultado["ingredientes"], 
                             resultado["modo_preparo"],
-                            resultado["classificacoes"] # <-- NOVO
+                            resultado["classificacoes"]
                         )
                     receitas_atualizadas += 1
-                    print(f"   -> ✅ Receita ID {resultado['id']} foi ATUALIZADA e CLASSIFICADA. ({receitas_atualizadas}/{total_receitas})")
+                    print(f"   -> Receita ID {resultado['id']} foi ATUALIZADA e CLASSIFICADA. ({receitas_atualizadas}/{total_receitas})")
                 except Exception as e:
-                    print(f"❌ Erro ao ATUALIZAR a receita ID {resultado['id']} no banco. Erro: {e}")
+                    print(f"Erro ao ATUALIZAR a receita ID {resultado['id']} no banco. Erro: {e}")
                     receitas_falhadas += 1
             else:
                 if not quota_exceeded_event.is_set():
                     receitas_falhadas += 1
 
-    # --- Relatório Final ---
     print("\n" + "="*50); print("Processo de revisão concluído.")
-    print(f"✅ {receitas_atualizadas} de {total_receitas} receitas foram atualizadas com sucesso.")
+    print(f"{receitas_atualizadas} de {total_receitas} receitas foram atualizadas com sucesso.")
     if receitas_falhadas > 0:
-        print(f"⚠️ {receitas_falhadas} receitas falharam no processamento (ver logs) e NÃO foram marcadas como 'revisado'.")
+        print(f"{receitas_falhadas} receitas falharam no processamento (ver logs) e NÃO foram marcadas como 'revisado'.")
     if quota_exceeded_event.is_set():
         print(f"\nATENÇÃO: A cota da API foi atingida."); 
         print("As receitas restantes (e as que falharam) NÃO foram revisadas. Rode o script novamente após a cota resetar.")

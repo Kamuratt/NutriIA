@@ -1,4 +1,3 @@
-# frontend/app.py
 import streamlit as st
 import requests
 import json
@@ -6,10 +5,13 @@ import os
 
 st.set_page_config(page_title="NutriAI", page_icon="🍎", layout="wide")
 
-# Lê a URL da API do ambiente Docker, com um valor padrão para testes locais
-API_URL = os.getenv("API_URL", "http://127.0.0.1:8000/planejar-dieta/")
+# Lê a URL BASE da API do ambiente Docker.
+# O valor padrão agora reflete a porta 8085 que funciona na sua máquina local.
+BASE_API_URL = os.getenv("API_URL", "http://127.0.0.1:8085")
 
-# --- DICIONÁRIOS DE MAPEAMENTO ---
+DIETA_ENDPOINT = "/planejar-dieta/"
+
+
 sexo_map = {"Masculino": "masculino", "Feminino": "feminino"}
 atividade_map = {"Sedentário": "sedentario", "Leve": "leve", "Moderado": "moderado", "Ativo": "ativo"}
 objetivo_map = {"Perder Peso": "perder_peso", "Manter Peso": "manter_peso", "Ganhar Massa": "ganhar_massa"}
@@ -44,7 +46,6 @@ with st.form(key="user_form"):
         atividade_selecionada = st.selectbox("Nível de Atividade Física:", list(atividade_map.keys()), index=None, placeholder="Selecione seu nível...")
         objetivo_selecionado = st.selectbox("Qual seu objetivo?", list(objetivo_map.keys()), index=None, placeholder="Selecione seu objetivo...")
 
-    # --- [INÍCIO DA ATUALIZAÇÃO] ---
     st.subheader("Saúde e Bem-estar (Opcional)")
     col_saude1, col_saude2 = st.columns(2)
     with col_saude1:
@@ -60,7 +61,6 @@ with st.form(key="user_form"):
             placeholder="Opcional, mas ajuda na avaliação",
             help="Medir na altura do umbigo. Ajuda a avaliar riscos metabólicos."
         )
-    # --- [FIM DA ATUALIZAÇÃO] ---
 
     st.subheader("Duração do Plano")
     tipo_plano_selecionado = st.radio(
@@ -110,7 +110,9 @@ if submit_button:
 
         with st.spinner(f"Gerando seu plano {tipo_plano_api}... Isso pode demorar alguns minutos."):
             try:
-                response = requests.post(API_URL, data=json.dumps(user_data))
+                full_api_url = f"{BASE_API_URL}{DIETA_ENDPOINT}"
+                
+                response = requests.post(full_api_url, data=json.dumps(user_data))
 
                 if response.status_code == 200:
                     st.success("Seu plano de dieta personalizado está pronto!")
@@ -130,4 +132,3 @@ if submit_button:
 
             except requests.exceptions.RequestException as e:
                 st.error(f"Não foi possível conectar à API. Verifique se o backend (Uvicorn) está rodando. Erro: {e}")
-

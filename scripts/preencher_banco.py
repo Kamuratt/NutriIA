@@ -3,12 +3,10 @@ import json
 import os
 import time
 
-# --- CONFIGURAÇÕES ---
 PASTA_A_PROCESSAR = "../data/receitas"
 PASTA_PROCESSADOS = "../data/receitas_processadas"
 ARQUIVO_BANCO = "../data/nutriai.db"
 
-# A função criar_tabelas continua a mesma.
 def criar_tabelas():
     conn = None
     try:
@@ -37,7 +35,6 @@ def criar_tabelas():
         if conn:
             conn.close()
 
-# A função de inserir também continua a mesma.
 def inserir_receita(conn, dados_receita: dict):
     cursor = conn.cursor()
     try:
@@ -56,13 +53,11 @@ def inserir_receita(conn, dados_receita: dict):
         return True
     except sqlite3.IntegrityError:
         # A receita já existe, consideramos um sucesso para fins de mover o arquivo.
-        print(f"⚠️  Aviso: Receita '{dados_receita['titulo']}' já existe. Será movida para processados.")
+        print(f"Aviso: Receita '{dados_receita['titulo']}' já existe. Será movida para processados.")
         return True
     except Exception as e:
-        print(f"❌ Erro inesperado ao inserir '{dados_receita['titulo']}': {e}")
+        print(f"Erro inesperado ao inserir '{dados_receita['titulo']}': {e}")
         return False
-
-# --- NOVA LÓGICA DE PROCESSAMENTO ---
 
 def processar_e_mover_arquivos():
     """Implementa a estratégia de duas etapas: primeiro insere tudo, depois move tudo."""
@@ -88,7 +83,7 @@ def processar_e_mover_arquivos():
                         # Se teve sucesso (ou era duplicata), adiciona à lista para mover depois
                         arquivos_processados_com_sucesso.append(nome_arquivo)
                 except (json.JSONDecodeError, KeyError) as e:
-                    print(f"❌ Erro ao ler o arquivo '{nome_arquivo}': {e}. O arquivo não será movido.")
+                    print(f"Erro ao ler o arquivo '{nome_arquivo}': {e}. O arquivo não será movido.")
         conn.commit()
     except sqlite3.Error as e:
         print(f"Ocorreu um erro de banco de dados na Etapa 1: {e}")
@@ -109,10 +104,10 @@ def processar_e_mover_arquivos():
         caminho_destino = os.path.join(PASTA_PROCESSADOS, nome_arquivo)
         try:
             os.rename(caminho_origem, caminho_destino)
-            print(f"✔️ Arquivo '{nome_arquivo}' movido com sucesso.")
+            print(f"Arquivo '{nome_arquivo}' movido com sucesso.")
             movidos += 1
         except Exception as e:
-            print(f"❌ Falha ao mover o arquivo '{nome_arquivo}': {e}")
+            print(f"Falha ao mover o arquivo '{nome_arquivo}': {e}")
             erros_movendo += 1
             
     print("\n--- RESUMO DA OPERAÇÃO ---")

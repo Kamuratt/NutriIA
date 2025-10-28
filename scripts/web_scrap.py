@@ -1,11 +1,11 @@
 import json
 import re
 import os
-import time  # Importe a biblioteca time
-import random # Importe a biblioteca random para pausas mais naturais
+import time
+import random
 import cloudscraper
 from bs4 import BeautifulSoup
-from unidecode import unidecode # Importe a biblioteca no início do seu script
+from unidecode import unidecode
 
 def buscar_links_receitas(termo: str, paginas: int = 1) -> list[str]:
     """Busca links de receitas pelo termo informado no TudoGostoso."""
@@ -30,7 +30,6 @@ def buscar_links_receitas(termo: str, paginas: int = 1) -> list[str]:
 
         soup = BeautifulSoup(resp.content, 'html.parser')
         
-        # --- LINHA CORRIGIDA COM O SELETOR CERTO ---
         links_encontrados = soup.select(".card-recipe .card-link")
 
         if not links_encontrados:
@@ -59,10 +58,8 @@ def scrape_receita(url: str, scraper) -> dict:
 
     soup = BeautifulSoup(pagina.content, 'html.parser')
 
-    # título
     titulo = soup.find('h1').get_text(strip=True)
 
-    # ingredientes
     ingredientes = [span.get_text(strip=True)
                     for span in soup.select('.recipe-ingredients-item-label')]
 
@@ -85,31 +82,28 @@ def scrape_receita(url: str, scraper) -> dict:
 def salvar_receita_json(receita: dict, pasta: str = "receitas"):
     """Salva uma receita em arquivo JSON com um nome de arquivo seguro e normalizado."""
     
-    # Adiciona uma verificação para garantir que a receita e o título existem
     if not receita or not receita.get("titulo"):
         print("AVISO: Receita sem título ou vazia. Não foi possível salvar.")
         return
     
     os.makedirs(pasta, exist_ok=True)
     
-    # --- LÓGICA DE LIMPEZA DE NOME DE ARQUIVO CORRIGIDA ---
-
-    # 1. Pega o título original
+    # Pega o título original
     titulo_original = receita["titulo"]
     
-    # 2. Normaliza: converte "Maçã" para "Maca", "Pão" para "Pao", etc.
+    # Normaliza: converte "Maçã" para "Maca", "Pão" para "Pao", etc.
     nome_normalizado = unidecode(titulo_original)
     
-    # 3. Converte tudo para minúsculas para padronizar
+    # Converte tudo para minúsculas para padronizar
     nome_normalizado = nome_normalizado.lower()
     
-    # 4. Substitui espaços e outros separadores por um único underscore
+    # Substitui espaços e outros separadores por um único underscore
     nome_normalizado = re.sub(r'[\s-]+', '_', nome_normalizado)
     
-    # 5. Remove qualquer caractere que não seja letra, número ou underscore
+    # Remove qualquer caractere que não seja letra, número ou underscore
     nome_seguro = re.sub(r'[^\w_]', '', nome_normalizado)
 
-    # 6. Monta o nome final do arquivo
+    # Monta o nome final do arquivo
     nome_arquivo = nome_seguro + ".json"
     
     caminho = os.path.join(pasta, nome_arquivo)
@@ -119,20 +113,17 @@ def salvar_receita_json(receita: dict, pasta: str = "receitas"):
         
     print(f"Arquivo '{caminho}' salvo com sucesso!")
 
-    # Defina o termo e o número de páginas que deseja buscar
 TERMO_DE_BUSCA = "pratico"
-NUMERO_DE_PAGINAS = 162 # Busque em 2 páginas de resultados, por exemplo
+NUMERO_DE_PAGINAS = 162
 scraper_global = cloudscraper.create_scraper()
 links_das_receitas = buscar_links_receitas(TERMO_DE_BUSCA, paginas=NUMERO_DE_PAGINAS)
 
 if links_das_receitas:
-    # ...
     for link in links_das_receitas:
         receita_extraida = scrape_receita(link, scraper_global)
         salvar_receita_json(receita_extraida)
-        # Pausa entre a extração de cada receita
         time.sleep(random.uniform(1, 3))
-else: # Este else pertence ao 'if'
+else:
     print("Nenhum link de receita foi encontrado para o termo informado.")
 
     print("\nProcesso finalizado!")

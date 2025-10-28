@@ -5,4 +5,6 @@ psycopg2-binary
 python-dotenv
 sqlalchemy
 google-generativeai
-fpdf2
+weasyprint
+jinja2
+markdown-it-py

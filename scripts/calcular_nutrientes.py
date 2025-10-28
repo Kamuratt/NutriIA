@@ -1,4 +1,3 @@
-# scripts/calcular_nutrientes.py
 import pandas as pd
 import unicodedata
 import random
@@ -14,7 +13,6 @@ from sqlalchemy import create_engine, text, exc as sqlalchemy_exc
 from sqlalchemy.engine import URL, Engine
 from dotenv import load_dotenv
 
-# --- CONFIGURAÇÃO ---
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
 load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
 
@@ -28,7 +26,6 @@ try:
 except ValueError as e:
     print(f"ERRO DE CONFIGURAÇÃO DA API: {e}"); exit()
 
-# --- FUNÇÕES AUXILIARES ---
 def corrigir_texto_quebrado(texto: str):
     if not isinstance(texto, str): return texto
     try: return texto.encode('latin-1').decode('utf-8')
@@ -45,10 +42,10 @@ def carregar_tabela_taco(caminho_csv: str = "data/processed/tabela_taco_processa
         df = pd.read_csv(caminho_completo)
         df['alimento_normalizado'] = df['alimento'].astype(str).str.lower().apply(lambda x: ''.join(c for c in unicodedata.normalize('NFD', x) if unicodedata.category(c) != 'Mn'))
         df.set_index('alimento_normalizado', inplace=True)
-        print("✔️ Tabela TACO carregada e normalizada com sucesso.")
+        print("Tabela TACO carregada e normalizada com sucesso.")
         return df
     except Exception as e:
-        print(f"❌ ERRO ao carregar a Tabela TACO: {e}"); return None
+        print(f"ERRO ao carregar a Tabela TACO: {e}"); return None
 
 def padronizar_unidade(unidade: str) -> str:
     if not unidade: return 'unidade'
@@ -115,8 +112,6 @@ def converter_para_gramas(ingrediente: dict) -> float:
     
     return 0.0
 
-# --- FUNÇÕES PRINCIPAIS ---
-
 def criar_tabela_cache(conn):
     query = text("""
         CREATE TABLE IF NOT EXISTS taco_complementar (
@@ -125,7 +120,7 @@ def criar_tabela_cache(conn):
         );
     """)
     conn.execute(query)
-    print("✔️ Tabela de cache 'taco_complementar' garantida no PostgreSQL.")
+    print("Tabela de cache 'taco_complementar' garantida no PostgreSQL.")
 
 def tentar_aprender_nutrientes_com_ia(nome_ingrediente: str) -> dict | None:
     print(f"   -> Aprendendo sobre '{nome_ingrediente}' com a IA...")
@@ -147,7 +142,7 @@ def tentar_aprender_nutrientes_com_ia(nome_ingrediente: str) -> dict | None:
             'fibras': float(dados.get('fibras', 0)),
             'texto_completo': response.text
         }
-        print(f"   -> ✅ IA aprendeu: '{nome_ingrediente}'")
+        print(f"   -> IA aprendeu: '{nome_ingrediente}'")
         return nutrientes
     except google_exceptions.ResourceExhausted as e:
         raise QuotaExceededError(f"Cota da API do Gemini excedida: {e}")
@@ -195,9 +190,7 @@ def salvar_nutrientes(conn, receita_id, totais):
     update_query = text("UPDATE receitas SET informacoes_nutricionais = :info, nutrientes_calculados = TRUE WHERE id = :id")
     conn.execute(update_query, {"info": json.dumps(totais), "id": receita_id})
 
-# --- BLOCO PRINCIPAL ---
 if __name__ == "__main__":
-    # --- ARGUMENTOS RESTAURADOS ---
     # Esta seção foi restaurada para que o script entenda --mode, --limit, etc.
     parser = argparse.ArgumentParser(description="Calcula os nutrientes de receitas no banco de dados NutriAI (PostgreSQL).")
     parser.add_argument('-m', '--mode', choices=['new', 'all', 'range'], default='new', help="Modo de execução: 'new' (padrão) para não calculadas, 'all' para todas, 'range' para IDs específicos.")
@@ -211,9 +204,9 @@ if __name__ == "__main__":
     try:
         db_url = URL.create(drivername="postgresql+psycopg2", username=os.getenv("POSTGRES_USER"), password=os.getenv("POSTGRES_PASSWORD"), host=os.getenv("POSTGRES_HOST"), port=os.getenv("POSTGRES_PORT"), database=os.getenv("POSTGRES_DB"), query={"client_encoding": "utf8"})
         engine = create_engine(db_url)
-        print("✔️ Conectado ao PostgreSQL.")
+        print("Conectado ao PostgreSQL.")
     except Exception as e:
-        print(f"❌ ERRO ao conectar ao PostgreSQL: {e}"); exit()
+        print(f"ERRO ao conectar ao PostgreSQL: {e}"); exit()
         
     api_disponivel = True
     
@@ -221,7 +214,6 @@ if __name__ == "__main__":
     with engine.connect() as conn:
         criar_tabela_cache(conn)
 
-        # --- LÓGICA DE QUERY RESTAURADA ---
         query_base = "SELECT id, titulo, ingredientes FROM receitas"
         params = {}
         where_clauses = ["processado_pela_llm = TRUE"]
@@ -238,7 +230,6 @@ if __name__ == "__main__":
                 start_id, end_id = sorted(args.ids)[:2]
                 where_clauses.append("id BETWEEN :start_id AND :end_id")
                 params.update({"start_id": start_id, "end_id": end_id})
-        # O modo 'all' não precisa de cláusula extra além de 'processado_pela_llm'
         
         final_query_str = f"{query_base} WHERE {' AND '.join(where_clauses)} ORDER BY id"
         if args.limit:
@@ -283,19 +274,19 @@ if __name__ == "__main__":
                             if nutriente in dados_nutricionais and pd.notna(dados_nutricionais[nutriente]):
                                 totais[nutriente] += float(dados_nutricionais[nutriente]) * fator
                     else:
-                        print(f"   -> ❌ AVISO: Falha ao encontrar/aprender sobre '{nome_ing}'. A receita não será calculada.")
+                        print(f"   -> AVISO: Falha ao encontrar/aprender sobre '{nome_ing}'. A receita não será calculada.")
                         sucesso_total = False
                         break 
 
                 if sucesso_total:
                     salvar_nutrientes(conn, receita.id, totais)
-                    print(f"   -> ✅ Nutrientes calculados e salvos.")
+                    print(f"   -> Nutrientes calculados e salvos.")
 
             except QuotaExceededError:
                 api_disponivel = False
                 print("\n\n!!! ATENÇÃO: Cota da API excedida. O aprendizado será desativado. !!!\n")
             except Exception as e_receita:
-                print(f"   -> ❌ Erro inesperado ao processar a receita. Alterações desfeitas. Erro: {e_receita}")
+                print(f"   -> Erro inesperado ao processar a receita. Alterações desfeitas. Erro: {e_receita}")
 
     if engine: engine.dispose()
     print("\nProcesso de cálculo de nutrientes concluído.")

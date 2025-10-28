@@ -9,10 +9,10 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 # 4. Copiar e Instalar Dependências:
-# Copiamos APENAS o requirements.txt primeiro. O Docker funciona em camadas,
+# Copiamos APENAS o requirements.txt primeiro.
+# O Docker funciona em camadas,
 # então ele só vai reinstalar as dependências se este arquivo mudar.
 COPY requirements.txt .
-
 # Rodamos o pip install para baixar e instalar tudo.
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -20,7 +20,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 
 # 6. Comando para Manter o Contêiner Rodando:
-# Seus scripts são de execução pontual. Para que o n8n (no futuro) ou nós mesmos 
-# possamos executá-los, o contêiner precisa ficar "vivo". Este comando simplesmente
+# Seus scripts são de execução pontual.
+# Para que o n8n (no futuro) ou nós mesmos
+# possamos executá-los, o contêiner precisa ficar "vivo".
+# Este comando simplesmente
 # mantém o contêiner rodando sem fazer nada.
 CMD ["tail", "-f", "/dev/null"]

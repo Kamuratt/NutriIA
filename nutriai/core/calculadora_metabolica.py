@@ -1,5 +1,3 @@
-# calculadora_metabolica.py
-
 def calcular_tmb(peso_kg: float, altura_cm: float, idade: int, sexo: str) -> float:
     """
     Calcula a Taxa Metabólica Basal (TMB) usando a equação de Mifflin-St Jeor.
