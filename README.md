@@ -97,7 +97,7 @@ A seleção de tecnologias foi feita para garantir performance, escalabilidade e
 ## Estrutura do Projeto
 
 ### O repositório está organizado da seguinte forma para manter a clareza e a separação de responsabilidades:
-
+```
 .
 ├── nutriai/
 │   ├── api/             # Lógica do backend com FastAPI
@@ -117,6 +117,7 @@ A seleção de tecnologias foi feita para garantir performance, escalabilidade e
 ├── .env.example     # Template para variáveis de ambiente
 ├── docker-compose.yml # Orquestração de todos os serviços
 └── README.md        # Esta documentação
+```
 
 ---
 
