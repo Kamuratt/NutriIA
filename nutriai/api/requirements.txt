@@ -8,3 +8,5 @@ google-generativeai
 weasyprint
 jinja2
 markdown-it-py
+thefuzz
+packaging
