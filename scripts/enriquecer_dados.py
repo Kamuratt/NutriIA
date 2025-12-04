@@ -2,15 +2,25 @@ import json
 import os
 import time
 import re
+from threading import Event, Lock
 import argparse
 import google.generativeai as genai
 from google.api_core import exceptions as google_exceptions
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dotenv import load_dotenv
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, text, exc as sqlalchemy_exc # Importe sqlalchemy_exc
 from sqlalchemy.engine import URL
 
+# Garante que o .env seja carregado da raiz do projeto
 dotenv_path = os.path.join(os.path.dirname(__file__), '..', '.env')
-load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
+if not os.path.exists(dotenv_path):
+    dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
+    
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path=dotenv_path, encoding='utf-8')
+    print(f"Arquivo .env carregado de: {dotenv_path}")
+else:
+    print("Aviso: Arquivo .env não encontrado nas localizações padrão.")
 
 class QuotaExceededError(Exception):
     """Exceção para quando a cota da API é atingida."""
@@ -26,116 +36,233 @@ except (ValueError, TypeError) as e:
     print(f"ERRO DE CONFIGURAÇÃO: {e}")
     exit()
 
-def parse_ingrediente_com_regras(texto: str):
-    """Tenta extrair dados de um ingrediente usando regras (RegEx)."""
-    if not texto: return None
-    unidades = ['xícara', 'xícaras', 'colher', 'colheres', 'copo', 'copos', 'g', 'kg', 'ml', 'l', 'lata', 'latas', 'dente', 'dentes', 'pitada', 'pitadas', 'unidade', 'unidades', 'fatia', 'fatias', 'ramo', 'ramos', 'folha', 'folhas', 'tablete', 'tabletes', 'pacote', 'pacotes', 'sachê', 'sachês']
-    padrao = r"^\s*(?P<quantidade>[\d\./,\s]+|\w+)\s+(?P<unidade>" + "|".join(unidades) + r"(?:s)?(?: de chá| de sopa)?)\s*(?:de\s+)?(?P<resto>.*)"
-    match = re.search(padrao, texto.strip(), re.IGNORECASE)
-    if match:
-        dados = match.groupdict()
-        nome, *obs_list = re.split(r'[,(]', dados.get("resto", "").strip(), 1)
-        observacao = obs_list[0].strip('() ') if obs_list else None
-        return {"nome_ingrediente": nome.strip(), "quantidade": dados.get("quantidade").strip(), "unidade": dados.get("unidade").strip(), "observacao": observacao, "texto_original": texto}
-    if "a gosto" in texto.lower() or "quanto baste" in texto.lower():
-        nome_limpo = re.sub(r'a gosto|quanto baste', '', texto, flags=re.IGNORECASE).strip()
-        return {"nome_ingrediente": nome_limpo, "quantidade": None, "unidade": None, "observacao": "a gosto", "texto_original": texto}
-    return None
+# ---- Variáveis Globais para Workers ----
+quota_exceeded_event = Event()
+print_lock = Lock()
+api_calls_count_lock = Lock()
+api_calls_count = 0
+# ----------------------------------------
 
 def analisar_ingrediente_com_gemini(texto_ingrediente: str):
     """Usa a IA para analisar e padronizar um ingrediente."""
+    global api_calls_count
+    if quota_exceeded_event.is_set(): return None 
+    
     model = genai.GenerativeModel('models/gemini-flash-latest')
     
-    # Adicionada a regra crítica para retornar "IGNORE" caso não seja um ingrediente.
     prompt = f"""
     Analise o seguinte texto: '{texto_ingrediente}'.
-
     REGRAS CRÍTICAS:
-    1. Se o texto NÃO for um ingrediente real (ex: um subtítulo como "Massa", "Recheio"; um utensílio como "Forma untada"; uma instrução), retorne APENAS a palavra "IGNORE".
-    2. Se o texto FOR um ingrediente real, extraia e retorne um único objeto JSON com as chaves: "nome_ingrediente", "quantidade", "unidade", "observacao".
+    1. Se o texto NÃO for um ingrediente real (ex: "Massa", "Recheio"), retorne APENAS a palavra "IGNORE".
+    2. Se houver alternativas (ex: "azeite ou óleo"), escolha APENAS o primeiro ingrediente (neste caso, "azeite").
+    3. Se houver múltiplos ingredientes (ex: "sal, pimenta e salsinha"), extraia APENAS o primeiro (neste caso, "sal").
+    4. Retorne um único objeto JSON com as chaves: "nome_ingrediente", "quantidade", "unidade", "observacao".
 
     REGRAS DE EXTRAÇÃO:
-    - "nome_ingrediente": O nome PADRONIZADO do ingrediente principal. Ex: para "cebola picadinha", o nome é "cebola".
-    - "observacao": Detalhes extras como "picadinha", "peneirada", "em rodelas".
-    - "unidade": Padronize para o singular (ex: "xícara", não "xícaras").
+    - "nome_ingrediente": O nome PADRONIZADO (ex: "cebola", "filé mignon", "farinha de trigo").
+    - "observacao": Detalhes extras (ex: "picadinha", "cortado em tiras").
+    - "unidade": Padronize para o singular (ex: "xícara").
 
     Exemplos de Resposta:
-    - Para o texto "2 xicaras de farinha de trigo peneirada", retorne: {{"nome_ingrediente": "farinha de trigo", "quantidade": "2", "unidade": "xícara", "observacao": "peneirada"}}
+    - Para o texto "2 xicaras de bifes de filé mignon cortados em tiras", retorne: {{"nome_ingrediente": "filé mignon", "quantidade": "2", "unidade": "xícara", "observacao": "bifes cortados em tiras"}}
+    - Para o texto "sal, pimenta e salsinha a gosto", retorne: {{"nome_ingrediente": "sal", "quantidade": null, "unidade": null, "observacao": "a gosto"}}
+    - Para o texto "2 colheres de azeite ou óleo", retorne: {{"nome_ingrediente": "azeite", "quantidade": "2", "unidade": "colher", "observacao": null}}
     - Para o texto "Cobertura:", retorne: IGNORE
-    - Para o texto "Forma de 20cm untada", retorne: IGNORE
     """
     
     try:
-        # Removido o response_mime_type para a IA ter liberdade de responder "IGNORE" como texto
+        time.sleep(0.5) 
         response = model.generate_content(prompt)
-        
+        with api_calls_count_lock: api_calls_count += 1
         texto_resposta = response.text.strip()
         
-        # Verifica se a IA decidiu ignorar o texto
         if texto_resposta == "IGNORE":
-            print(f"   -> IA ignorou texto que não é ingrediente: '{texto_ingrediente}'")
-            return "IGNORE" # Retorna a flag para ser tratada no loop principal
+            return "IGNORE"
 
-        # Se não for "IGNORE", tenta processar como JSON
-        dados = json.loads(texto_resposta)
+        json_match = re.search(r'\{.*\}', texto_resposta, re.DOTALL)
+        if not json_match:
+            return None
+        
+        dados = json.loads(json_match.group(0))
         if not isinstance(dados, dict):
-            print(f"   -> Resposta da API para '{texto_ingrediente}' não é um objeto JSON válido: {dados}")
             return None
 
         dados['texto_original'] = texto_ingrediente
         return dados
         
     except google_exceptions.ResourceExhausted as e:
-        raise QuotaExceededError(f"Cota da API do Gemini excedida: {e}")
+        quota_exceeded_event.set() 
+        with print_lock: print(f"\n!!! QUOTA ATINGIDA (Ingrediente) !!!\n")
+        raise QuotaExceededError(f"Cota: {e}")
     except Exception as e:
-        print(f"   -> Erro ao processar resposta da IA para '{texto_ingrediente}': {e}")
-        print(f"   -> Resposta recebida: {response.text if 'response' in locals() else 'N/A'}")
+        with print_lock: print(f"   -> Erro IA (Ingrediente) '{texto_ingrediente}': {e}")
         return None
 
 def corrigir_titulo_receita_com_gemini(titulo: str, retries=3, delay=2):
-    """Usa a IA para corrigir e padronizar o título de uma receita."""
+    """Usa a IA para corrigir e padronizar o título."""
+    global api_calls_count
+    if quota_exceeded_event.is_set(): return titulo 
+    
     model = genai.GenerativeModel('models/gemini-flash-latest')
-    prompt = f"Corrija e padronize o seguinte título de receita: '{titulo}'. Remova erros de digitação e formatações estranhas. Retorne APENAS o texto do título corrigido, sem aspas ou palavras como 'Título:'."
+    prompt = f"Corrija e padronize o seguinte título de receita: '{titulo}'. Retorne APENAS o texto corrigido."
     for attempt in range(retries):
         try:
+            time.sleep(0.5)
             response = model.generate_content(prompt)
+            with api_calls_count_lock: api_calls_count += 1
             titulo_corrigido = response.text.strip().strip('"').strip("'")
-            if titulo_corrigido:
-                return titulo_corrigido
-        except Exception as e:
-            print(f"   -> Aviso: Erro ao tentar corrigir o título '{titulo}' (tentativa {attempt + 1}): {e}")
+            if titulo_corrigido: return titulo_corrigido
+        except google_exceptions.ResourceExhausted as e: 
+            quota_exceeded_event.set()
+            raise QuotaExceededError(f"Cota: {e}")
+        except Exception:
             time.sleep(delay)
-    print(f"   -> Aviso: Não foi possível corrigir o título '{titulo}'. Usando o original.")
     return titulo
 
-def buscar_receitas_nao_processadas(conn, limit=None):
-    """Busca receitas que ainda não foram processadas pela IA."""
-    query_str = "SELECT id, titulo, ingredientes_brutos FROM receitas WHERE processado_pela_llm = FALSE AND ingredientes_brutos IS NOT NULL ORDER BY id;"
+def classificar_restricoes_com_gemini(titulo: str, ingredientes_json: list) -> dict:
+    """Classifica as restrições alimentares."""
+    global api_calls_count
+    if quota_exceeded_event.is_set(): raise QuotaExceededError("Cota atingida.")
+    
+    nomes = [item.get('nome_ingrediente', item.get('texto_original', '')) for item in ingredientes_json]
+    lista_str = ", ".join(filter(None, nomes))
+    
+    model = genai.GenerativeModel('models/gemini-flash-latest')
+    prompt = f"""
+    Analise a receita: "{titulo}" (Ingredientes: {lista_str}).
+    Retorne JSON com 8 booleanos: 
+    "is_vegan", "is_vegetarian", "is_gluten_free", "is_lactose_free", 
+    "is_nut_free", "is_seafood_free", "is_egg_free", "is_soy_free".
+    Retorne APENAS o JSON.
+    """
+    
+    default = {"is_vegan": False, "is_vegetarian": False, "is_gluten_free": False, "is_lactose_free": False,
+               "is_nut_free": False, "is_seafood_free": False, "is_egg_free": False, "is_soy_free": False}
+    
+    try:
+        time.sleep(0.5)
+        response = model.generate_content(prompt, generation_config=genai.types.GenerationConfig(response_mime_type="application/json"))
+        with api_calls_count_lock: api_calls_count += 1
+        
+        match = re.search(r'\{.*\}', response.text.strip(), re.DOTALL)
+        if not match: return default
+            
+        classif = json.loads(match.group(0))
+        for k in default:
+            if k not in classif: classif[k] = default[k]
+        return classif
+    
+    except google_exceptions.ResourceExhausted as e:
+        quota_exceeded_event.set()
+        raise QuotaExceededError(f"Cota: {e}")
+    except Exception:
+        return default
+
+def buscar_receitas(conn, mode='new', limit=None):
+    # Filtramos "tem_erro = FALSE" para não insistir no erro
+    where_clauses = ["ingredientes_brutos IS NOT NULL", "tem_erro = FALSE"]
+    
+    if mode == 'new':
+        where_clauses.append("processado_pela_llm = FALSE")
+    elif mode == 'all':
+        pass 
+
+    query_str = f"SELECT id, titulo, ingredientes_brutos FROM receitas WHERE {' AND '.join(where_clauses)} ORDER BY id;"
+    
     if limit:
         query_str = query_str.replace(";", f" LIMIT {limit};")
-    query = text(query_str)
-    return conn.execute(query).fetchall()
+        
+    return conn.execute(text(query_str)).fetchall()
 
-def salvar_dados_e_marcar_como_processada(conn, receita_id, titulo_corrigido, lista_ingredientes_estruturados):
+def marcar_receita_com_erro(conn, receita_id):
+    """Marca a receita como problemática para não tentar de novo."""
+    try:
+        conn.execute(text("UPDATE receitas SET tem_erro = TRUE WHERE id = :id"), {"id": receita_id})
+    except Exception as e:
+        with print_lock: print(f"   -> ERRO ao marcar flag de erro ID {receita_id}: {e}")
+
+def salvar_sucesso(conn, dados):
     """Salva os dados processados."""
-    update_query = text("""
+    query = text("""
         UPDATE receitas SET
             titulo = :titulo,
-            ingredientes = :ingredientes_json,
+            ingredientes = :ingredientes,
             processado_pela_llm = TRUE,
-            revisado = TRUE
-        WHERE id = :receita_id;
+            tem_erro = FALSE,
+            revisado = TRUE,
+            is_vegan = :is_vegan,
+            is_vegetarian = :is_vegetarian,
+            is_gluten_free = :is_gluten_free,
+            is_lactose_free = :is_lactose_free,
+            is_nut_free = :is_nut_free,
+            is_seafood_free = :is_seafood_free,
+            is_egg_free = :is_egg_free,
+            is_soy_free = :is_soy_free,
+            nutrientes_calculados = FALSE,
+            informacoes_nutricionais = NULL
+        WHERE id = :id
     """)
     params = {
-        "titulo": titulo_corrigido,
-        "ingredientes_json": json.dumps(lista_ingredientes_estruturados, ensure_ascii=False),
-        "receita_id": receita_id
+        "titulo": dados["titulo"],
+        "ingredientes": json.dumps(dados["ingredientes"], ensure_ascii=False),
+        "id": dados["receita_id"]
     }
-    conn.execute(update_query, params)
+    params.update(dados["classificacoes"])
+    
+    # Executa a query. Se der erro de integridade (titulo duplicado), vai lançar exceção
+    conn.execute(query, params)
+
+def processar_receita_completa(row):
+    """
+    Retorna uma tupla: (id, sucesso, dados_ou_erro)
+    """
+    if quota_exceeded_event.is_set():
+        return (row[0], False, "Cota excedida")
+        
+    receita_id, titulo_bruto, ingredientes_brutos = row
+    
+    try:
+        # Tratamento de título
+        try: titulo_enc = titulo_bruto.encode('latin1').decode('utf-8')
+        except: titulo_enc = titulo_bruto
+        
+        titulo_final = corrigir_titulo_receita_com_gemini(titulo_enc)
+
+        if not ingredientes_brutos:
+            classif = classificar_restricoes_com_gemini(titulo_final, [])
+            return (receita_id, True, {
+                "receita_id": receita_id, "titulo": titulo_final, 
+                "ingredientes": [], "classificacoes": classif
+            })
+        
+        lista_ingredientes = []
+        for texto in ingredientes_brutos:
+            if quota_exceeded_event.is_set(): raise QuotaExceededError("Cota")
+            if not texto.strip(): continue
+
+            dados = analisar_ingrediente_com_gemini(texto)
+            if dados == "IGNORE": continue
+            if dados: lista_ingredientes.append(dados)
+        
+        classif = classificar_restricoes_com_gemini(titulo_final, lista_ingredientes)
+
+        return (receita_id, True, {
+            "receita_id": receita_id,
+            "titulo": titulo_final,
+            "ingredientes": lista_ingredientes,
+            "classificacoes": classif
+        })
+    
+    except QuotaExceededError:
+        return (receita_id, False, "Cota excedida")
+    except Exception as e:
+        return (receita_id, False, f"Erro geral: {str(e)}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Processa ingredientes de novas receitas usando IA.")
-    parser.add_argument("--limit", type=int, help="Número máximo de receitas para processar.")
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-m', '--mode', choices=['new', 'all'], default='new')
+    parser.add_argument("--limit", type=int)
+    parser.add_argument("--workers", type=int, default=10)
     args = parser.parse_args()
 
     try:
@@ -148,82 +275,70 @@ if __name__ == "__main__":
         engine = create_engine(db_url)
         print("Conectado ao PostgreSQL.")
     except Exception as e:
-        print(f"ERRO ao conectar ao PostgreSQL: {e}")
-        exit()
-
-    api_calls_count = 0
+        print(f"ERRO Conexão DB: {e}"); exit()
     
     try:
         with engine.connect() as conn_leitura:
-            receitas_para_processar = buscar_receitas_nao_processadas(conn_leitura, limit=args.limit)
+            receitas = buscar_receitas(conn_leitura, mode=args.mode, limit=args.limit)
         
-        total_receitas = len(receitas_para_processar)
-        if not receitas_para_processar:
-            print("Nenhuma receita nova para processar.")
+        if not receitas:
+            print("Nenhuma receita para processar.")
         else:
-            print(f"Encontradas {total_receitas} receitas para processar com IA.")
+            print(f"Processando {len(receitas)} receitas com {args.workers} workers...")
 
-        print("\nIniciando processamento das receitas...")
-        
-        for i, row in enumerate(receitas_para_processar):
-            receita_id, titulo_bruto, ingredientes_brutos = row
+        sucessos = 0
+        falhas = 0
+
+        with ThreadPoolExecutor(max_workers=args.workers) as executor:
+            futures = {executor.submit(processar_receita_completa, row): row for row in receitas}
             
-            with engine.begin() as conn_escrita:
+            for future in as_completed(futures):
+                if quota_exceeded_event.is_set():
+                    for f in futures: f.cancel()
+                    break
+
                 try:
-                    try:
-                        titulo_corrigido_encoding = titulo_bruto.encode('latin1').decode('utf-8')
-                    except:
-                        titulo_corrigido_encoding = titulo_bruto
+                    rid, sucesso, payload = future.result()
                     
-                    titulo_final = corrigir_titulo_receita_com_gemini(titulo_corrigido_encoding)
-                    api_calls_count += 1
-                    time.sleep(1.1)
-
-                    if not ingredientes_brutos:
-                        salvar_dados_e_marcar_como_processada(conn_escrita, receita_id, titulo_final, [])
-                        continue
-                    
-                    lista_ingredientes_estruturados = []
-                    sucesso_total_receita = True
-                    
-                    for texto_ingrediente in ingredientes_brutos:
-                        if not texto_ingrediente.strip():
-                            continue
-
-                        dados_estruturados = parse_ingrediente_com_regras(texto_ingrediente)
+                    if sucesso:
+                        # TENTA SALVAR
+                        try:
+                            with engine.begin() as conn:
+                                salvar_sucesso(conn, payload)
+                            sucessos += 1
+                            with print_lock: print(f"   -> SUCESSO ID {rid} ({sucessos}/{len(receitas)})")
                         
-                        if not dados_estruturados:
-                            dados_estruturados = analisar_ingrediente_com_gemini(texto_ingrediente)
-                            api_calls_count += 1
-                            time.sleep(1.1)
-
-                        if dados_estruturados == "IGNORE":
-                            continue # Simplesmente pula para o próximo ingrediente
+                        # CAPTURA ERROS DE DUPLICIDADE (IntegrityError)
+                        except sqlalchemy_exc.IntegrityError as e_integrity:
+                            # Se der erro de título duplicado, marca como ERRO no banco
+                            with engine.begin() as conn:
+                                marcar_receita_com_erro(conn, rid)
+                            falhas += 1
+                            with print_lock: print(f"   -> FALHA ID {rid} (Título Duplicado): Marcada com erro.")
                         
-                        if dados_estruturados:
-                            lista_ingredientes_estruturados.append(dados_estruturados)
-                        else:
-                            print(f"\nFalha crítica ao processar ingrediente '{texto_ingrediente}' para a receita ID {receita_id}.")
-                            sucesso_total_receita = False
-                            break
-                    
-                    if sucesso_total_receita:
-                        salvar_dados_e_marcar_como_processada(conn_escrita, receita_id, titulo_final, lista_ingredientes_estruturados)
-                        print(f"   -> Receita ID {receita_id} ('{titulo_final}') foi processada e salva.")
-                
-                except Exception as e_receita:
-                    print(f"\nErro ao processar a receita ID {receita_id}. Alterações desfeitas. Erro: {e_receita}")
+                        # OUTROS ERROS SQL
+                        except Exception as e_salvar:
+                             # Também marca como erro para não travar o fluxo
+                            with engine.begin() as conn:
+                                marcar_receita_com_erro(conn, rid)
+                            falhas += 1
+                            with print_lock: print(f"   -> FALHA ID {rid} (Erro ao Salvar): {e_salvar}")
 
-            if (i + 1) % 50 == 0 and total_receitas > 50:
-                print(f"\n--- Progresso: {i + 1} de {total_receitas} receitas processadas. ---")
+                    else:
+                        # Falha no processamento da IA
+                        msg_erro = str(payload)
+                        if "Cota" not in msg_erro:
+                            with engine.begin() as conn:
+                                marcar_receita_com_erro(conn, rid)
+                            falhas += 1
+                            with print_lock: print(f"   -> FALHA ID {rid} (Erro IA): {msg_erro}")
+                        
+                except Exception as e:
+                    with print_lock: print(f"   -> CRITICAL ERROR: {e}")
 
-    except QuotaExceededError:
-        print(f"\n!!! ATENÇÃO: Cota da API do Gemini excedida. !!!")
-        print(f"O script fez {api_calls_count} chamadas à IA antes de parar.")
-        print("Na próxima execução, ele continuará de onde parou.")
-    except Exception as e_geral:
-        print(f"\nUm erro geral ocorreu: {e_geral}")
-        import traceback
-        traceback.print_exc()
+    except KeyboardInterrupt:
+        print("\nInterrupção manual.")
     finally:
-        print("\nProcesso de estruturação de ingredientes concluído.")
+        print(f"\nFim. Sucessos: {sucessos} | Falhas Marcadas: {falhas}")
+        if quota_exceeded_event.is_set():
+            print("COTA ATINGIDA. As receitas não processadas serão tentadas amanhã.")

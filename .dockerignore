@@ -18,3 +18,5 @@ __pycache__/
 
 # Pasta de receitas (se você baixa os JSONs antes de inserir no banco)
 /receitas/
+
+.env

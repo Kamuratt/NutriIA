@@ -2,192 +2,123 @@
 <html lang="pt-br">
 <head>
     <meta charset="UTF-8">
-    <title>Plano de Dieta NutriAI</title>
+    <title>Plano NutriAI</title>
     <style>
-        /* CSS para um PDF "Excelente" FINAL v3 */
-        @page {
-            size: A4;
-            margin: 2cm;
-            /* Adiciona número de página no rodapé */
-            @bottom-center {
-                content: "Página " counter(page) " de " counter(pages);
-                font-size: 9pt;
-                color: #666;
-            }
+        @page { 
+            size: A4; 
+            margin: 2cm; 
+            @bottom-center { 
+                content: "NutriAI • Página " counter(page); 
+                font-size: 9pt; color: #999; margin-top: 10px; border-top: 1px solid #eee; padding-top: 5px;
+            } 
         }
         
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            line-height: 1.6;
-            color: #333;
-        }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #333; line-height: 1.6; font-size: 11pt; }
+        
+        h1 { color: #2E8B57; font-size: 26pt; border-bottom: 3px solid #2E8B57; margin-bottom: 20px; padding-bottom: 5px; text-transform: uppercase; }
+        
+        h2 { background-color: #2E8B57; color: #fff; font-size: 18pt; padding: 8px 15px; margin-top: 40px; margin-bottom: 20px; border-radius: 6px; page-break-after: avoid; }
 
-        /* Tenta evitar que títulos fiquem órfãos */
-        h1, h2, h3, h4, h5, h6 {
+        /* --- Plano Semanal --- */
+        .plan-content h3 { 
+            background-color: #f1f8e9; color: #1b5e20; font-size: 14pt; font-weight: 700;
+            padding: 8px 12px; border-left: 5px solid #2E8B57; margin-top: 30px; margin-bottom: 15px;
             page-break-after: avoid;
-            page-break-inside: avoid;
         }
-        /* Tenta evitar linhas "viúvas" e "órfãs" em parágrafos */
-        p {
-             widows: 2;
-             orphans: 2;
-             page-break-inside: auto; /* Permite quebrar, mas respeita widows/orphans */
+        .plan-content strong { color: #2E8B57; font-weight: 700; }
+        .plan-content ul { padding-left: 0; list-style-type: none; }
+        .plan-content li { padding: 8px 0; border-bottom: 1px dotted #ddd; margin-bottom: 5px; page-break-inside: avoid; }
+        .plan-content li:before { content: "• "; color: #2E8B57; font-weight: bold; margin-right: 5px; }
+
+        /* --- GUIA DE RECEITAS (Onde estava o problema) --- */
+        .section-title { color: #2E8B57; font-size: 22pt; border-bottom: 3px solid #2E8B57; margin-top: 50px; margin-bottom: 40px; page-break-before: always; }
+
+        .recipe-card { 
+            /* Mais espaço e separação clara */
+            margin-bottom: 60px; 
+            padding-bottom: 30px;
+            border-bottom: 2px solid #a5d6a7; /* Linha verde visível separando receitas */
+            page-break-inside: auto; 
         }
-        /* Tenta evitar que itens de lista quebrem no meio */
-        li {
-             page-break-inside: avoid;
+        
+        .recipe-card h2 { 
+            background: none; color: #2E8B57; padding: 0; margin: 0 0 15px 0; 
+            font-size: 20pt; border-bottom: none; box-shadow: none;
+            page-break-after: avoid;
         }
 
-        h1 {
-            color: #2E8B57; /* Verde NutriAI */
-            font-size: 26pt;
-            border-bottom: 3px solid #2E8B57;
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-        h2 {
-            color: #333;
-            font-size: 18pt;
-            border-bottom: 1px solid #ccc;
-            padding-bottom: 5px;
-            margin-top: 25px;
-            margin-bottom: 15px;
-        }
-        h3 { /* Usado para dias da semana e subtítulos de receita */
-            color: #444;
-            font-size: 14pt;
-            font-style: normal; /* Removido itálico dos dias */
-            margin-top: 20px;
-            margin-bottom: 10px;
-            border-bottom: 1px dotted #ccc;
-            padding-bottom: 3px;
-        }
+        .dia-tag { display: block; font-size: 10pt; color: #666; margin-bottom: 15px; font-style: italic; }
 
-        /* REMOVIDA a classe .page-break
-         .page-break { page-break-after: always; }
-        */
+        .nutri-badge {
+            display: inline-block; background: #e8f5e9; color: #2e7d32; padding: 6px 12px;
+            border-radius: 20px; font-weight: bold; font-size: 10pt; border: 1px solid #a5d6a7; margin-bottom: 25px;
+        }
+        
+        h4 { margin: 20px 0 10px 0; font-size: 12pt; color: #444; text-transform: uppercase; border-bottom: 1px solid #eee; padding-bottom: 5px; page-break-after: avoid; }
+        
+        /* Ingredientes com mais espaço */
+        .ingredients-container ul { margin: 0; padding-left: 20px; }
+        .ingredients-container li { margin-bottom: 6px; line-height: 1.4; }
 
-        .perfil {
-            background-color: #f8f8f8;
-            border-left: 5px solid #2E8B57;
-            padding: 15px 20px;
-            margin-bottom: 25px;
+        /* --- MODO DE PREPARO (Correção do Texto Colado) --- */
+        .method p {
+            margin-bottom: 12px; /* Espaço entre parágrafos */
+            text-align: justify;
             font-size: 11pt;
-            border-radius: 0 5px 5px 0;
-        }
-        .perfil strong { color: #2E8B57; }
-
-        /* Plano da IA (Markdown convertido) */
-        .plano-texto { font-size: 10pt; }
-        .plano-texto table { /* Estilos para tabelas (caso a IA gere por engano) */
-            border-collapse: collapse; width: 100%; margin-bottom: 1em; page-break-inside: avoid;
-        }
-        .plano-texto th, .plano-texto td { border: 1px solid #ddd; padding: 6px; text-align: left; }
-        .plano-texto th { background-color: #f2f2f2; }
-        .plano-texto ul { list-style-type: none; padding-left: 10px; margin-top: 0.5em; }
-        .plano-texto li { margin-bottom: 8px; border-left: 2px solid #eee; padding-left: 8px; }
-        .plano-texto strong { color: #333; }
-        .plano-texto p { margin-bottom: 0.8em; }
-        /* Títulos de Dia (###) vindos do Markdown */
-        .plano-texto h3 {
-             font-size: 14pt; font-style: normal; color: #444; border-bottom: 1px dotted #ccc;
-             padding-bottom: 3px; margin-top: 20px;
         }
 
-        /* Lista de Compras */
-        .lista-compras { margin-top: 15px; }
-        .lista-compras ul {
-            column-count: 2; column-gap: 30px;
-            list-style-type: "🛒 "; /* Trocado emoji */
-            font-size: 10pt; padding-left: 25px;
-        }
-        .lista-compras li {
-            padding-left: 8px; margin-bottom: 6px;
-            /* page-break-inside: avoid; */ /* Removido para testar fluxo */
-        }
-
-        /* Receitas */
-        .receitas-container { margin-top: 10px; }
-        .receita {
-            background-color: #fff; border: 1px solid #e0e0e0; border-radius: 6px;
-            padding: 15px 20px; margin-top: 15px; margin-bottom: 20px;
-            /* --- CORREÇÃO PRINCIPAL DO ESPAÇAMENTO --- */
-            /* Removida a 'page-break-inside: avoid;' para permitir que receitas quebrem */
-            page-break-before: auto;
-        }
-        .receita h2 { /* Título da Receita */
-            margin-top: 0; font-size: 16pt; color: #2E8B57; border-bottom: none; margin-bottom: 5px;
-        }
-        .receita h3 { /* Ingredientes / Modo de Preparo */
-            font-size: 12pt; color: #333; border-bottom: 1px solid #eee;
-            padding-bottom: 3px; margin-top: 15px; margin-bottom: 8px;
-        }
-        .receita-dia {
-            font-style: italic; font-size: 9pt; color: #777; margin-top: -5px; margin-bottom: 10px;
-        }
-        .receita-macros {
-            font-size: 9pt; font-weight: bold; color: #555; background-color: #f5f5f5;
-            padding: 6px 10px; border-radius: 4px; display: inline-block; margin-bottom: 12px;
-        }
-        .receita p { font-size: 10pt; margin-bottom: 0.8em; }
-
+        .profile { background: #f0f7f4; padding: 15px; border-radius: 8px; margin-bottom: 30px; border: 1px solid #cce5d6; }
     </style>
 </head>
 <body>
-    <h1>Plano de Dieta Personalizado</h1>
-    <div class="perfil">
-        <h2>Resumo do Perfil</h2>
+    <div class="header">
+        <h1>Plano Nutricional Personalizado</h1>
+        <p style="text-align: center; color: #666;">Gerado pela Inteligência Artificial NutriAI</p>
+    </div>
+
+    <div class="profile">
         <p>
-            <strong>Objetivo:</strong> {{ user.objetivo|replace('_', ' ')|title }}<br>
-            <strong>Meta Calórica Diária:</strong> {{ meta_calorica|round(0)|int }} kcal<br>
-            <strong>Perfil:</strong> {{ user.sexo|title }}, {{ user.idade }} anos, {{ user.peso_kg }}kg, {{ user.altura_cm }}cm
+            <strong>OBJETIVO:</strong> {{ user.objetivo|replace('_', ' ')|title }} &nbsp;|&nbsp;
+            <strong>META DIÁRIA:</strong> {{ meta_calorica|int }} kcal &nbsp;|&nbsp;
+            <strong>PERFIL:</strong> {{ user.sexo|title }}, {{ user.idade }} anos, {{ user.peso_kg }}kg
         </p>
     </div>
-    <div class="plano-texto">
+
+    <div class="plan-content">
         {{ plano_html|safe }}
     </div>
 
-    <h1>Lista de Compras Sugerida</h1>
-    <div class="lista-compras">
-        <ul>
-            {% if lista_compras %}
-                {% for item in lista_compras %}
-                    <li>{{ item|replace('-', '')|trim }}</li>
-                {% endfor %}
-            {% else %}
-                <li>Nenhuma receita foi processada, lista de compras vazia.</li>
+    <h1 class="section-title">Guia de Receitas Sugeridas</h1>
+    
+    {% if receitas %}
+        {% for receita in receitas %}
+        <div class="recipe-card">
+            <h2>{{ receita.titulo }}</h2>
+            {% if receita.dia_sugerido %}
+            <span class="dia-tag">📅 Sugestão: {{ receita.dia_sugerido }}</span>
             {% endif %}
-        </ul>
-    </div>
+            
+            <div class="nutri-badge">{{ receita.nutri_info }}</div>
 
-    <h1>Detalhes das Receitas</h1>
-    <div class="receitas-container">
-        {% if receitas %}
-            {% for receita in receitas %}
-                <div class="receita">
-                    <h2>{{ receita.titulo }}</h2>
-                    {% if receita.dia_sugerido %}
-                    <p class="receita-dia">(Sugerida para: {{ receita.dia_sugerido }})</p>
-                    {% endif %}
-                    
-                    {% if receita.calorias and receita.calorias > 0 %}
-                    <p class="receita-macros">
-                        Kcal: {{ receita.calorias|round(0)|int }} |
-                        Proteínas: {{ receita.proteinas|round(0)|int }}g |
-                        Carboidratos: {{ receita.carboidratos|round(0)|int }}g |
-                        Gorduras: {{ receita.gorduras|round(0)|int }}g
-                    </p>
-                    {% endif %}
-                    
-                    <h3>Ingredientes</h3>
-                    <p>{{ receita.ingredientes|map(attribute='descricao')|join(', ') }}</p>
-                    <h3>Modo de Preparo</h3>
-                    <p>{{ receita.modo_preparo|replace('\n', '<br>')|safe }}</p>
-                </div>
-            {% endfor %}
-        {% else %}
-            <p>Nenhuma receita detalhada encontrada (verifique as receitas selecionadas pela IA e a base de dados).</p>
-        {% endif %}
-    </div>
+            <h4>Ingredientes</h4>
+            <div class="ingredients-container">
+                <ul>
+                    {% for ing in receita.ingredientes %}
+                        <li>{{ ing|safe }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+
+            <h4>Modo de Preparo</h4>
+            <div class="method">
+                {% for paragrafo in receita.modo_preparo_paragrafos %}
+                    <p>{{ paragrafo }}</p>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    {% else %}
+        <p><em>Nenhuma receita específica do banco de dados foi vinculada a este plano.</em></p>
+    {% endif %}
 </body>
 </html>
